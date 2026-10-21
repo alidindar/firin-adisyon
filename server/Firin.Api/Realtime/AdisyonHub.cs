@@ -29,8 +29,17 @@ public static class RealtimeExtensions
         group.AddEndpointFilter(async (ctx, next) =>
         {
             var result = await next(ctx);
-            if (!HttpMethods.IsGet(ctx.HttpContext.Request.Method))
-                await notify(ctx.HttpContext.RequestServices.GetRequiredService<IRealtime>());
+            if (HttpMethods.IsGet(ctx.HttpContext.Request.Method)) return result;
+            var sp = ctx.HttpContext.RequestServices;
+            try
+            {
+                await notify(sp.GetRequiredService<IRealtime>());
+            }
+            catch (Exception e)
+            {
+                // Değişiklik zaten kaydedildi; istemci 500 görüp tekrar denemesin.
+                sp.GetRequiredService<ILogger<AdisyonHub>>().LogWarning(e, "Değişiklik yayını gönderilemedi.");
+            }
             return result;
         });
         return group;
