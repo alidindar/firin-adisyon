@@ -42,6 +42,7 @@ app.UseAuthorization();
 var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapAuthEndpoints();
+api.MapCatalogEndpoints();
 api.MapFallback(() => Results.NotFound());
 app.MapFallbackToFile("index.html", staticFiles);
 
