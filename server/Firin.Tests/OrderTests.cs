@@ -239,6 +239,40 @@ public sealed class OrderTests : IDisposable
     }
 
     [Fact]
+    public async Task Parallel_adds_of_same_piece_product_are_not_lost()
+    {
+        await SetupAsync();
+        await AddOk(_tea.Id, 1);
+        var results = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Add(_tea.Id, 1)));
+        Assert.All(results, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var line = Assert.Single((await Detail()).Order!.Items);
+        Assert.Equal(21, line.Quantity);
+        Assert.Equal(21 * 1500, line.LineTotalKurus);
+    }
+
+    [Fact]
+    public async Task Parallel_adds_on_empty_table_open_exactly_one_order()
+    {
+        await SetupAsync();
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Add(_cookie.Id, 100)));
+        Assert.All(results, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        Assert.Equal(8, (await Detail()).Order!.Items.Count);
+        Assert.Equal(1, _app.Db(db => db.Orders.Count(o => o.Status == OrderStatus.Open)));
+    }
+
+    [Fact]
+    public async Task Old_gram_line_is_not_merged_after_product_becomes_piece()
+    {
+        await SetupAsync();
+        await AddOk(_cookie.Id, 100);
+        await _owner.PutAsJsonAsync($"/api/admin/products/{_cookie.Id}",
+            new { categoryId = _cookie.CategoryId, name = "Tuzlu kurabiye", unitType = "Piece", priceKurus = 60000, isActive = true, sortOrder = 0 });
+        var d = await AddOk(_cookie.Id, 1);
+        Assert.Equal(2, d.Order!.Items.Count);
+        Assert.Equal(new[] { UnitType.Gram, UnitType.Piece }, d.Order.Items.Select(i => i.UnitType).ToArray());
+    }
+
+    [Fact]
     public async Task Inactive_tables_are_not_listed()
     {
         await SetupAsync();

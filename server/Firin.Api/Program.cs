@@ -20,6 +20,7 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddFirinAuth();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRealtime, SignalRRealtime>();
+builder.Services.AddSingleton<OrderLock>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Firin.Api.Orders;
 
-public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtime, ILogger<OrderService> log)
+public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtime, OrderLock orderLock,
+    ILogger<OrderService> log)
 {
     public DateTime Now => clock.GetUtcNow().UtcDateTime;
 
@@ -44,6 +45,14 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
 
     public async Task<TableDetailDto> AddItemAsync(int tableId, int productId, int quantity, int userId)
     {
+        using (await orderLock.AcquireAsync())
+            await AddItemCoreAsync(tableId, productId, quantity, userId);
+        await NotifyAsync(tableId);
+        return await GetTableAsync(tableId);
+    }
+
+    private async Task AddItemCoreAsync(int tableId, int productId, int quantity, int userId)
+    {
         var table = await db.Tables.FirstOrDefaultAsync(t => t.Id == tableId) ?? throw TableNotFound();
         if (!table.IsActive) throw new DomainException("masa_pasif", "Bu masa kullanımda değil.");
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId)
@@ -55,7 +64,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
 
         var merge = product.UnitType == UnitType.Piece
             ? order.Items.FirstOrDefault(i => i.ProductId == productId && i.VoidedAt == null
-                && i.PaymentId == null && i.UnitPriceKurus == product.PriceKurus)
+                && i.UnitType == UnitType.Piece && i.PaymentId == null && i.UnitPriceKurus == product.PriceKurus)
             : null;
         if (merge is not null)
         {
@@ -79,11 +88,18 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
             });
         }
         await db.SaveChangesAsync();
+    }
+
+    public async Task<TableDetailDto> SetQuantityAsync(int itemId, int quantity, int userId)
+    {
+        int tableId;
+        using (await orderLock.AcquireAsync())
+            tableId = await SetQuantityCoreAsync(itemId, quantity, userId);
         await NotifyAsync(tableId);
         return await GetTableAsync(tableId);
     }
 
-    public async Task<TableDetailDto> SetQuantityAsync(int itemId, int quantity, int userId)
+    private async Task<int> SetQuantityCoreAsync(int itemId, int quantity, int userId)
     {
         var (order, item) = await LoadEditableItemAsync(itemId);
         Pricing.ValidateQuantity(item.UnitType, quantity);
@@ -92,11 +108,19 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         EnsureNotBelowPaid(order);
         CloseIfSettled(order, userId);
         await db.SaveChangesAsync();
-        await NotifyAsync(order.TableId);
-        return await GetTableAsync(order.TableId);
+        return order.TableId;
     }
 
     public async Task<TableDetailDto> VoidItemAsync(int itemId, int userId)
+    {
+        int tableId;
+        using (await orderLock.AcquireAsync())
+            tableId = await VoidItemCoreAsync(itemId, userId);
+        await NotifyAsync(tableId);
+        return await GetTableAsync(tableId);
+    }
+
+    private async Task<int> VoidItemCoreAsync(int itemId, int userId)
     {
         var (order, item) = await LoadEditableItemAsync(itemId);
         item.VoidedAt = Now;
@@ -113,8 +137,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
             CloseIfSettled(order, userId);
         }
         await db.SaveChangesAsync();
-        await NotifyAsync(order.TableId);
-        return await GetTableAsync(order.TableId);
+        return order.TableId;
     }
 
     /// <summary>Aktif kalem varsa ve kalan sıfırsa adisyonu kapatır. Kaydetmez.</summary>
