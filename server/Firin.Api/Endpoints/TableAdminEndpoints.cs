@@ -2,6 +2,7 @@ using Firin.Api.Realtime;
 using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Domain;
+using Firin.Api.Orders;
 using Microsoft.EntityFrameworkCore;
 
 namespace Firin.Api.Endpoints;
@@ -31,17 +32,21 @@ public static class TableAdminEndpoints
             return ToDto(t);
         });
 
-        g.MapPut("/{id:int}", async (int id, TableInput input, AppDb db) =>
+        g.MapPut("/{id:int}", async (int id, TableInput input, AppDb db, OrderLock orderLock) =>
         {
             var t = await db.Tables.FindAsync(id) ?? throw Validate.NotFound();
             var isActive = RequireActive(input);
             t.Name = await UniqueNameAsync(db, input.Name, id);
             t.SortOrder = input.SortOrder;
-            if (t.IsActive && !isActive &&
-                await db.Orders.AnyAsync(o => o.TableId == id && o.Status == OrderStatus.Open))
-                throw new DomainException("masa_acik", "Bu masada açık hesap var. Önce hesabı kapatın.", StatusCodes.Status409Conflict);
-            t.IsActive = isActive;
-            await db.SaveChangesAsync();
+            // Pasife alırken kontrol+kayıt kilit altında: aynı anda ilk kalem eklenip açık adisyon kalmasın.
+            using (await orderLock.AcquireAsync())
+            {
+                if (t.IsActive && !isActive &&
+                    await db.Orders.AnyAsync(o => o.TableId == id && o.Status == OrderStatus.Open))
+                    throw new DomainException("masa_acik", "Bu masada açık hesap var. Önce hesabı kapatın.", StatusCodes.Status409Conflict);
+                t.IsActive = isActive;
+                await db.SaveChangesAsync();
+            }
             return ToDto(t);
         });
     }

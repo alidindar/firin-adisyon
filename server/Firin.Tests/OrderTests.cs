@@ -261,6 +261,39 @@ public sealed class OrderTests : IDisposable
     }
 
     [Fact]
+    public async Task First_add_creates_exactly_one_open_order_with_one_item()
+    {
+        await SetupAsync();
+        await AddOk(_tea.Id, 2);
+        Assert.Equal((1, 1), _app.Db(db => (
+            db.Orders.Count(o => o.Status == OrderStatus.Open),
+            db.Orders.Include(o => o.Items).Single().Items.Count)));
+    }
+
+    [Fact]
+    public async Task Rejected_first_add_leaves_no_order_behind()
+    {
+        await SetupAsync();
+        Assert.Equal("miktar_gecersiz", await (await Add(_tea.Id, 0)).ProblemCode());
+        Assert.Equal(0, _app.Db(db => db.Orders.Count()));
+    }
+
+    [Fact]
+    public async Task Failed_save_of_first_item_leaves_no_empty_open_order()
+    {
+        await SetupAsync();
+        _app.Db(db => db.Database.ExecuteSqlRaw(
+            "CREATE TRIGGER fail_item BEFORE INSERT ON OrderItems BEGIN SELECT RAISE(ABORT, 'disk dolu'); END"));
+
+        var res = await Add(_tea.Id, 1);
+        Assert.False(res.IsSuccessStatusCode);
+        Assert.Equal(0, _app.Db(db => db.Orders.Count()));
+
+        _app.Db(db => db.Database.ExecuteSqlRaw("DROP TRIGGER fail_item"));
+        Assert.Single((await AddOk(_tea.Id, 1)).Order!.Items);
+    }
+
+    [Fact]
     public async Task Old_gram_line_is_not_merged_after_product_becomes_piece()
     {
         await SetupAsync();

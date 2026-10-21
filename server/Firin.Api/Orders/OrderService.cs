@@ -39,10 +39,15 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         return new TableDetailDto(table.Id, table.Name, order is null ? null : await ToDtoAsync(order));
     }
 
+    /// <summary>
+    /// Masanın açık adisyonunu kalem ve ödemeleriyle yükler (izlenen). Çağıran <see cref="OrderLock"/>'u tutmalı;
+    /// kilit yeniden girişli değildir.
+    /// </summary>
     public Task<Order?> LoadOpenOrderAsync(int tableId) => db.Orders
         .Include(o => o.Items).Include(o => o.Payments)
         .FirstOrDefaultAsync(o => o.TableId == tableId && o.Status == OrderStatus.Open);
 
+    /// <summary>OrderLock'u kendisi alır; kilit tutulurken çağrılmamalı (kilit yeniden girişli değil).</summary>
     public async Task<TableDetailDto> AddItemAsync(int tableId, int productId, int quantity, int userId)
     {
         using (await orderLock.AcquireAsync())
@@ -60,10 +65,39 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         if (!product.IsActive) throw new DomainException("urun_pasif", "Bu ürün satışta değil.");
         Pricing.ValidateQuantity(product.UnitType, quantity);
 
-        var order = await LoadOpenOrderAsync(tableId) ?? await OpenOrderAsync(tableId, userId);
+        var order = await LoadOpenOrderAsync(tableId);
+        if (order is not null)
+        {
+            ApplyAdd(order, product, quantity, userId);
+            await db.SaveChangesAsync();
+            return;
+        }
 
+        // Adisyon ilk kalemle tek kayıtta açılır; ayrı kayıt olsaydı ikincisi başarısız olunca boş adisyon kalırdı.
+        order = new Order { TableId = tableId, OpenedAt = Now, OpenedById = userId };
+        db.Orders.Add(order);
+        ApplyAdd(order, product, quantity, userId);
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Savunma amaçlı: başka biri bu masaya adisyon açtıysa (benzersiz indeks) onunkine ekle.
+            foreach (var item in order.Items.ToList()) db.Entry(item).State = EntityState.Detached;
+            db.Entry(order).State = EntityState.Detached;
+            var existing = await LoadOpenOrderAsync(tableId);
+            if (existing is null) throw;
+            ApplyAdd(existing, product, quantity, userId);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    // Kaydetmeden: aynı adet ürünü mevcut satıra ekler, yoksa yeni satır açar.
+    private void ApplyAdd(Order order, Product product, int quantity, int userId)
+    {
         var merge = product.UnitType == UnitType.Piece
-            ? order.Items.FirstOrDefault(i => i.ProductId == productId && i.VoidedAt == null
+            ? order.Items.FirstOrDefault(i => i.ProductId == product.Id && i.VoidedAt == null
                 && i.UnitType == UnitType.Piece && i.PaymentId == null && i.UnitPriceKurus == product.PriceKurus)
             : null;
         if (merge is not null)
@@ -87,9 +121,9 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
                 AddedAt = Now,
             });
         }
-        await db.SaveChangesAsync();
     }
 
+    /// <summary>OrderLock'u kendisi alır; kilit tutulurken çağrılmamalı (kilit yeniden girişli değil).</summary>
     public async Task<TableDetailDto> SetQuantityAsync(int itemId, int quantity, int userId)
     {
         int tableId;
@@ -111,6 +145,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         return order.TableId;
     }
 
+    /// <summary>OrderLock'u kendisi alır; kilit tutulurken çağrılmamalı (kilit yeniden girişli değil).</summary>
     public async Task<TableDetailDto> VoidItemAsync(int itemId, int userId)
     {
         int tableId;
@@ -140,7 +175,11 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         return order.TableId;
     }
 
-    /// <summary>Aktif kalem varsa ve kalan sıfırsa adisyonu kapatır. Kaydetmez.</summary>
+    /// <summary>
+    /// Aktif kalem varsa ve kalan sıfırsa adisyonu kapatır. Kaydetmez. Çağıran <see cref="OrderLock"/>'u tutmalı.
+    /// Kilit yeniden girişli değildir: kilit tutulurken AddItemAsync, SetQuantityAsync veya VoidItemAsync
+    /// çağrılmamalı (kendi içlerinde kilit alırlar, kilitlenme olur).
+    /// </summary>
     public void CloseIfSettled(Order order, int userId)
     {
         if (order.Items.Any(i => i.VoidedAt == null) && OrderMath.Remaining(order) == 0)
@@ -156,25 +195,6 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
     {
         try { await realtime.TableChanged(tableId); }
         catch (Exception e) { log.LogWarning(e, "Masa değişikliği yayını gönderilemedi."); }
-    }
-
-    private async Task<Order> OpenOrderAsync(int tableId, int userId)
-    {
-        var order = new Order { TableId = tableId, OpenedAt = Now, OpenedById = userId };
-        db.Orders.Add(order);
-        try
-        {
-            await db.SaveChangesAsync();
-            return order;
-        }
-        catch (DbUpdateException)
-        {
-            // Başka bir cihaz aynı anda bu masaya adisyon açtı (benzersiz indeks); onunkini kullan.
-            db.Entry(order).State = EntityState.Detached;
-            var existing = await LoadOpenOrderAsync(tableId);
-            if (existing is null) throw;
-            return existing;
-        }
     }
 
     private async Task<(Order, OrderItem)> LoadEditableItemAsync(int itemId)
