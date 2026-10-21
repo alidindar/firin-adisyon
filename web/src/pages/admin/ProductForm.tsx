@@ -47,12 +47,13 @@ export function ProductForm({ product, categories, onClose }: Props) {
       else if (removePhoto && saved.photoUrl) saved = await adminApi.deletePhoto(saved.id);
       return saved;
     },
-    onSuccess: () => {
+    onSuccess: () => onClose(),
+    onError: (e) => setError(e.message),
+    // Ürün kaydedilip fotoğraf başarısız olsa da liste güncel kalsın (yinelenen ürün oluşmasın).
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['admin'] });
       qc.invalidateQueries({ queryKey: ['catalog'] });
-      onClose();
     },
-    onError: (e) => setError(e.message),
   });
 
   const pickPhoto = async (file: File | undefined) => {
