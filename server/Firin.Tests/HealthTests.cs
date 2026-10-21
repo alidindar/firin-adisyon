@@ -27,4 +27,13 @@ public sealed class HealthTests : IDisposable
         var res = await _app.Client.GetAsync("/api/olmayan-yol");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
+
+    [Fact]
+    public async Task Spa_route_serves_index_html()
+    {
+        var res = await _app.Client.GetAsync("/masa/5");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal("text/html", res.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("<title>test</title>", await res.Content.ReadAsStringAsync());
+    }
 }

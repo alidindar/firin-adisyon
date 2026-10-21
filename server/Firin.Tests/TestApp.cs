@@ -26,10 +26,16 @@ public sealed class TestApp : IDisposable
 
     public TestApp()
     {
+        // Gerçek wwwroot/index.html olmadan SPA fallback sınanamaz.
+        var webRoot = Path.Combine(DataDir, "wwwroot");
+        Directory.CreateDirectory(webRoot);
+        File.WriteAllText(Path.Combine(webRoot, "index.html"), "<!doctype html><title>test</title>");
+
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Testing");
             b.UseSetting("Firin:DataDir", DataDir);
+            b.UseWebRoot(webRoot);
             b.ConfigureServices(s =>
             {
                 s.RemoveAll<TimeProvider>();
