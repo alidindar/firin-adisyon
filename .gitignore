@@ -1,0 +1,9 @@
+bin/
+obj/
+node_modules/
+dist/
+data/
+*.db
+*.db-*
+publish/
+.vs/
