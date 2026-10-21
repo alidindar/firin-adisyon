@@ -8,8 +8,13 @@ namespace Firin.Api.Endpoints;
 public static class UserAdminEndpoints
 {
     public record UserDto(int Id, string Name, Role Role, bool IsActive);
-    public record UserCreateInput(string Name, string Pin, Role Role);
-    public record UserUpdateInput(string Name, Role Role, bool IsActive, string? Pin);
+    public record UserCreateInput(string Name, string Pin, Role? Role);
+    public record UserUpdateInput(string Name, Role? Role, bool? IsActive, string? Pin);
+
+    private static readonly SemaphoreSlim OwnerGate = new(1, 1);
+
+    private static Role RequireRole(Role? role) =>
+        role is { } r && Enum.IsDefined(r) ? r : throw new DomainException("rol_gecersiz", "Rol geçersiz.");
 
     private static UserDto ToDto(User u) => new(u.Id, u.Name, u.Role, u.IsActive);
 
@@ -24,8 +29,8 @@ public static class UserAdminEndpoints
         {
             var name = await UniqueNameAsync(db, input.Name, null);
             if (!PinHasher.IsValidFormat(input.Pin)) throw AuthEndpoints.PinFormatError();
-            if (!Enum.IsDefined(input.Role)) throw new DomainException("rol_gecersiz", "Rol geçersiz.");
-            var u = new User { Name = name, PinHash = hasher.Hash(input.Pin), Role = input.Role };
+            var role = RequireRole(input.Role);
+            var u = new User { Name = name, PinHash = hasher.Hash(input.Pin), Role = role };
             db.Users.Add(u);
             await db.SaveChangesAsync();
             return ToDto(u);
@@ -33,24 +38,36 @@ public static class UserAdminEndpoints
 
         g.MapPut("/{id:int}", async (int id, UserUpdateInput input, AppDb db, PinHasher hasher, PinLockout lockout) =>
         {
-            var u = await db.Users.FindAsync(id) ?? throw Validate.NotFound();
-            if (!Enum.IsDefined(input.Role)) throw new DomainException("rol_gecersiz", "Rol geçersiz.");
+            var role = RequireRole(input.Role);
+            var isActive = input.IsActive ?? throw new DomainException("aktiflik_gecersiz", "Aktiflik durumu belirtilmeli.");
 
-            var losesOwner = u is { Role: Role.Owner, IsActive: true } && (input.Role != Role.Owner || !input.IsActive);
-            if (losesOwner && !await db.Users.AnyAsync(x => x.Id != id && x.Role == Role.Owner && x.IsActive))
-                throw new DomainException("son_sahip", "En az bir aktif sahip hesabı kalmalı.", StatusCodes.Status409Conflict);
-
-            u.Name = await UniqueNameAsync(db, input.Name, id);
-            u.Role = input.Role;
-            u.IsActive = input.IsActive;
-            if (!string.IsNullOrEmpty(input.Pin))
+            await OwnerGate.WaitAsync();
+            try
             {
-                if (!PinHasher.IsValidFormat(input.Pin)) throw AuthEndpoints.PinFormatError();
-                u.PinHash = hasher.Hash(input.Pin);
-                lockout.Success(id); // yeni PIN verilince kilit kalkar
+                var u = await db.Users.FindAsync(id) ?? throw Validate.NotFound();
+
+                var losesOwner = u is { Role: Role.Owner, IsActive: true } && (role != Role.Owner || !isActive);
+                if (losesOwner && !await db.Users.AnyAsync(x => x.Id != id && x.Role == Role.Owner && x.IsActive))
+                    throw new DomainException("son_sahip", "En az bir aktif sahip hesabı kalmalı.", StatusCodes.Status409Conflict);
+
+                u.Name = await UniqueNameAsync(db, input.Name, id);
+                u.Role = role;
+                u.IsActive = isActive;
+                var pinChanged = !string.IsNullOrEmpty(input.Pin);
+                if (pinChanged)
+                {
+                    if (!PinHasher.IsValidFormat(input.Pin)) throw AuthEndpoints.PinFormatError();
+                    u.PinHash = hasher.Hash(input.Pin!);
+                }
+                await db.SaveChangesAsync();
+                if (pinChanged)
+                {
+                    using var _ = await lockout.AcquireAsync(id);
+                    lockout.Success(id); // yeni PIN verilince kilit kalkar
+                }
+                return ToDto(u);
             }
-            await db.SaveChangesAsync();
-            return ToDto(u);
+            finally { OwnerGate.Release(); }
         });
     }
 

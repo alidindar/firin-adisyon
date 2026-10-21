@@ -80,4 +80,46 @@ public sealed class UserAdminTests : IDisposable
         var staff = await _app.StaffAsync();
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/admin/users")).StatusCode);
     }
+
+    [Fact]
+    public async Task Concurrent_cross_demotions_leave_an_active_owner()
+    {
+        var a = await _app.OwnerAsync();
+        var aId = await MyIdAsync(a);
+        var b = await (await a.PostAsJsonAsync("/api/admin/users", new { name = "Ortak", pin = "2222", role = "Owner" })).ReadAs<UserDto>();
+        var bClient = await _app.LoginAsync(b.Id, "2222");
+
+        var t1 = a.PutAsJsonAsync($"/api/admin/users/{b.Id}", new { name = "Ortak", role = "Staff", isActive = true, pin = (string?)null });
+        var t2 = bClient.PutAsJsonAsync($"/api/admin/users/{aId}", new { name = "Sahip", role = "Staff", isActive = true, pin = (string?)null });
+        await Task.WhenAll(t1, t2);
+
+        var owners = _app.Db(db => db.Users.Count(u => u.Role == Role.Owner && u.IsActive));
+        Assert.True(owners >= 1);
+    }
+
+    [Fact]
+    public async Task Create_without_role_is_rejected()
+    {
+        var owner = await _app.OwnerAsync();
+        var res = await owner.PostAsJsonAsync("/api/admin/users", new { name = "Mehmet", pin = "4321" });
+        Assert.Equal("rol_gecersiz", await res.ProblemCode());
+    }
+
+    [Fact]
+    public async Task Update_without_role_or_is_active_is_rejected()
+    {
+        var owner = await _app.OwnerAsync();
+        var u = await (await owner.PostAsJsonAsync("/api/admin/users", new { name = "Mehmet", pin = "4321", role = "Staff" })).ReadAs<UserDto>();
+
+        var noRole = await owner.PutAsJsonAsync($"/api/admin/users/{u.Id}", new { name = "Mehmet", isActive = true });
+        Assert.Equal("rol_gecersiz", await noRole.ProblemCode());
+
+        var noActive = await owner.PutAsJsonAsync($"/api/admin/users/{u.Id}", new { name = "Mehmet", role = "Staff" });
+        Assert.Equal("aktiflik_gecersiz", await noActive.ProblemCode());
+
+        var list = await (await owner.GetAsync("/api/admin/users")).ReadAs<List<UserDto>>();
+        var after = list.Single(x => x.Id == u.Id);
+        Assert.True(after.IsActive);
+        Assert.Equal(Role.Staff, after.Role);
+    }
 }
