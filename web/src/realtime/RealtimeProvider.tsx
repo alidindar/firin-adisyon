@@ -1,5 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { useQueryClient } from '@tanstack/react-query';
+import { isAuthError } from './authError';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type Status = 'connecting' | 'connected' | 'reconnecting';
@@ -20,9 +21,28 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     let stopped = false;
     let retryTimer: number | undefined;
 
+    const sessionExpired = () => {
+      stopped = true; // oturum yokken yeniden denemenin anlamı yok; giriş ekranı açılır, bu bileşen kapanır
+      window.clearTimeout(retryTimer);
+      qc.setQueryData(['me'], null);
+    };
+    // Sunucuya ulaşılabiliyorsa oturumun hâlâ geçerli olduğunu sorar; ağ hatası sessizce yok sayılır.
+    const probeSession = () => {
+      fetch('/api/auth/me', { credentials: 'same-origin' })
+        .then((r) => {
+          if (r.status === 401 && !stopped) sessionExpired();
+        })
+        .catch(() => undefined);
+    };
+
     const conn = new HubConnectionBuilder()
       .withUrl('/hubs/adisyon')
-      .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (c) => Math.min(1000 * 2 ** c.previousRetryCount, 5000) })
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (c) => {
+          probeSession();
+          return Math.min(1000 * 2 ** c.previousRetryCount, 5000);
+        },
+      })
       .configureLogging(LogLevel.Warning)
       .build();
 
@@ -51,15 +71,21 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         if (stopped) return;
         setStatus('connected');
         qc.invalidateQueries(); // kopukken kaçan değişiklikleri al
-      } catch {
-        if (!stopped) {
-          setStatus('reconnecting');
-          schedule();
+      } catch (err) {
+        if (stopped) return;
+        if (isAuthError(err)) {
+          sessionExpired();
+          return;
         }
+        setStatus('reconnecting');
+        schedule();
       }
     };
 
-    conn.onreconnecting(() => setStatus('reconnecting'));
+    conn.onreconnecting(() => {
+      setStatus('reconnecting');
+      probeSession();
+    });
     conn.onreconnected(() => {
       setStatus('connected');
       qc.invalidateQueries();

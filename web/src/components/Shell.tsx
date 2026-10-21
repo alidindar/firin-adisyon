@@ -27,19 +27,21 @@ function ShellLayout({ me }: { me: Me }) {
 
   return (
     <>
-      <header className="shell-header">
-        <nav>
-          <NavLink to="/" end>Masalar</NavLink>
-          {isOwner && <NavLink to="/yonetim">Yönetim</NavLink>}
-        </nav>
-        <div className="shell-user">
-          <span>{me.name}</span>
-          <button onClick={logout}>Kullanıcı değiştir</button>
-        </div>
-      </header>
-      {connection === 'reconnecting' && (
-        <div className="banner" role="status">Kasa bilgisayarına bağlantı yok. Yeniden bağlanılıyor…</div>
-      )}
+      <div className="shell-top">
+        <header className="shell-header">
+          <nav>
+            <NavLink to="/" end>Masalar</NavLink>
+            {isOwner && <NavLink to="/yonetim">Yönetim</NavLink>}
+          </nav>
+          <div className="shell-user">
+            <span>{me.name}</span>
+            <button onClick={logout}>Kullanıcı değiştir</button>
+          </div>
+        </header>
+        {connection === 'reconnecting' && (
+          <div className="banner" role="status">Kasa bilgisayarına bağlantı yok. Yeniden bağlanılıyor…</div>
+        )}
+      </div>
       <main>
         <Routes>
           <Route path="/" element={<TablesPage />} />

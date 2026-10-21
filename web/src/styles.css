@@ -66,8 +66,8 @@ input, select {
 .pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 300px; margin: 0 auto; }
 .pinpad button { min-height: 64px; font-size: 1.5rem; }
 
+.shell-top { position: sticky; top: 0; z-index: 10; }
 .shell-header {
-  position: sticky; top: 0; z-index: 10;
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 8px 16px; padding-top: max(8px, env(safe-area-inset-top));
   background: var(--surface); border-bottom: 1px solid var(--border);
@@ -126,7 +126,6 @@ section h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--muted); }
 
 .muted { color: var(--muted); }
 .banner {
-  position: sticky; top: 0; z-index: 20;
   padding: 10px 16px; background: var(--danger); color: #fff; text-align: center; font-weight: 600;
 }
 
@@ -136,5 +135,5 @@ section h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--muted); }
   min-height: 112px; padding: 12px; text-align: left;
 }
 .table-card.busy { background: var(--busy); border-color: var(--accent); }
-.table-name { font-weight: 700; font-size: 1.1rem; }
+.table-name { font-weight: 700; font-size: 1.1rem; overflow-wrap: anywhere; }
 .table-total { font-size: 1.35rem; font-weight: 700; color: var(--accent); }
