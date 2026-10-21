@@ -1,3 +1,9 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Firin.Api.Auth;
+using Firin.Api.Data;
+using Firin.Api.Domain;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -35,11 +41,52 @@ public sealed class TestApp : IDisposable
 
     public HttpClient NewClient() => Factory.CreateClient();
 
+    public static readonly JsonSerializerOptions Json =
+        new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+    public T Db<T>(Func<AppDb, T> work)
+    {
+        using var scope = Factory.Services.CreateScope();
+        return work(scope.ServiceProvider.GetRequiredService<AppDb>());
+    }
+
+    public int SeedUser(string name, string pin, Role role) => Db(db =>
+    {
+        var hasher = Factory.Services.GetRequiredService<PinHasher>();
+        var u = new User { Name = name, PinHash = hasher.Hash(pin), Role = role };
+        db.Users.Add(u);
+        db.SaveChanges();
+        return u.Id;
+    });
+
+    public async Task<HttpClient> LoginAsync(int userId, string pin)
+    {
+        var c = NewClient();
+        var res = await c.PostAsJsonAsync("/api/auth/login", new { userId, pin });
+        res.EnsureSuccessStatusCode();
+        return c;
+    }
+
+    public Task<HttpClient> OwnerAsync() => LoginAsync(SeedUser("Sahip", "1234", Role.Owner), "1234");
+    public Task<HttpClient> StaffAsync(string name = "Garson") => LoginAsync(SeedUser(name, "5678", Role.Staff), "5678");
+
     public void Dispose()
     {
         Client.Dispose();
         Factory.Dispose();
         SqliteConnection.ClearAllPools();
         try { Directory.Delete(DataDir, recursive: true); } catch (IOException) { }
+    }
+}
+
+public static class HttpExt
+{
+    public static async Task<T> ReadAs<T>(this HttpResponseMessage res) =>
+        (await res.Content.ReadFromJsonAsync<T>(TestApp.Json))!;
+
+    public static async Task<string?> ProblemCode(this HttpResponseMessage res)
+    {
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        return doc.RootElement.TryGetProperty("code", out var c) ? c.GetString() : null;
     }
 }
