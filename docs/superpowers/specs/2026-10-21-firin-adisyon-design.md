@@ -1,6 +1,6 @@
 # Fırın Adisyon — Tasarım (Spec)
 
-Tarih: 2026-10-21 · Durum: onaylandı, uygulama planı bekliyor
+Tarih: 2026-10-21 · Durum: onaylandı, uygulama planı yazıldı (docs/superpowers/plans/)
 
 ## Bağlam
 Tek bir fırın-kafe için masa hesaplarını tutan bir uygulama. Ürünleri ve fiyatları fırın sahibi girer. Ürünler adetle (poğaça, çay) ya da gramla (kuru pasta, baklava) satılır. Birden fazla masa olur, her masanın toplamı anlık hesaplanır. Öncelik kasadaki Windows bilgisayar. Tablet ve telefon (Android/iOS) da aynı veriyi canlı görür.
@@ -74,7 +74,7 @@ Tablet / telefon / PC tarayıcı → http://<kasa-ip>:5080
 firin-adisyon/
   server/Firin.Api/        Program.cs, Domain/, Data/, Endpoints/, Hubs/, Auth/
   server/Firin.Tests/      xUnit
-  web/                     React + Vite (src/pages, components, api, lib/money.ts)
+  web/                     React + Vite (src/pages, components, api, lib/format.ts)
   scripts/publish.ps1      self-contained win-x64 yayın, web derlemesini wwwroot'a kopyalar
   scripts/install-service.ps1  Windows Service ve güvenlik duvarı kuralı
   docs/superpowers/specs/2026-10-21-firin-adisyon-design.md
@@ -93,8 +93,8 @@ firin-adisyon/
 Her adım ayrı commit olur. Commit atmadan önce kullanıcıya sorulur.
 
 ## Doğrulama
-- **xUnit:** gram ve adet tutar hesabı, kalan tutar, kısmi ödeme, fazla ödemenin reddi, ürün seçerek ödeme ve otomatik kapanma test edilir. Uç noktalar `WebApplicationFactory` ve SQLite in-memory ile entegrasyon testinden geçer. Yetki testi: garson 403 alır.
-- **Vitest:** `money.ts` biçimlendirmesi ve tuş takımı ayrıştırması test edilir.
+- **xUnit:** gram ve adet tutar hesabı, kalan tutar, kısmi ödeme, fazla ödemenin reddi, ürün seçerek ödeme ve otomatik kapanma test edilir. Uç noktalar `WebApplicationFactory` ve her test için geçici bir SQLite dosyasıyla entegrasyon testinden geçer. Yetki testi: garson 403 alır.
+- **Vitest:** `format.ts` biçimlendirmesi ve tuş takımı ayrıştırması test edilir.
 - **Uçtan uca:** sunucu çalıştırılır. İki tarayıcı sekmesinde biri garson, diğeri sahip olarak açılır. Birine kalem eklenince diğerinde anında göründüğü doğrulanır. Gramlı ürün, bölünmüş ödeme ve gün sonu raporu denenir.
 - **Ekran boyutları:** 394 px (telefon), 800 px (tablet) ve masaüstü genişliğinde kontrol edilir. Tabloların kesilmediği ayrıca ölçülür.
 - Yayın betiğiyle servis kurulur. Telefondan `http://<ip>:5080` adresine bağlanılarak test edilir.
