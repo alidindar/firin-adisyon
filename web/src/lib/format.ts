@@ -22,3 +22,7 @@ export function formatQuantity(unitType: UnitType, quantity: number): string {
   if (quantity < 1000) return `${quantity} g`;
   return `${kg.format(quantity / 1000)} kg`;
 }
+
+export function formatPrice(unitType: UnitType, priceKurus: number): string {
+  return `${formatKurus(priceKurus)} / ${unitType === 'Piece' ? 'adet' : 'kg'}`;
+}

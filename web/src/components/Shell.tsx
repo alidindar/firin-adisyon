@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
+import { AdminPage } from '../pages/admin/AdminPage';
 import { HomePage } from '../pages/HomePage';
 
 export function Shell({ me }: { me: Me }) {
@@ -19,7 +20,7 @@ export function Shell({ me }: { me: Me }) {
       <header className="shell-header">
         <nav>
           <NavLink to="/" end>Masalar</NavLink>
-          {isOwner && null /* Parça 2: Yönetim, Parça 5: Raporlar bağlantıları buraya */}
+          {isOwner && <NavLink to="/yonetim">Yönetim</NavLink>}
         </nav>
         <div className="shell-user">
           <span>{me.name}</span>
@@ -29,6 +30,7 @@ export function Shell({ me }: { me: Me }) {
       <main>
         <Routes>
           <Route path="/" element={<HomePage me={me} />} />
+          {isOwner && <Route path="/yonetim/*" element={<AdminPage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatKurus, formatQuantity, parseTlToKurus } from './format';
+import { formatKurus, formatPrice, formatQuantity, parseTlToKurus } from './format';
 
 describe('formatKurus', () => {
   it('Türk lirası biçiminde yazar', () => {
@@ -32,5 +32,12 @@ describe('formatQuantity', () => {
     expect(formatQuantity('Gram', 250)).toBe('250 g');
     expect(formatQuantity('Gram', 1250)).toBe('1,25 kg');
     expect(formatQuantity('Gram', 1000)).toBe('1 kg');
+  });
+});
+
+describe('formatPrice', () => {
+  it('birimiyle birlikte yazar', () => {
+    expect(formatPrice('Piece', 4500)).toBe('₺45,00 / adet');
+    expect(formatPrice('Gram', 60000)).toBe('₺600,00 / kg');
   });
 });
