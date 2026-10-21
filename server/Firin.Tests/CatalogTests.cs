@@ -112,4 +112,19 @@ public sealed class CatalogTests : IDisposable
         Assert.Equal("Tatlılar", dto.Name);
         Assert.Equal(2, dto.SortOrder);
     }
+
+    [Fact]
+    public async Task Product_without_unit_type_or_is_active_is_rejected()
+    {
+        var owner = await _app.OwnerAsync();
+        var cat = await Seed.CategoryAsync(owner, "Eksik");
+
+        var noUnit = await owner.PostAsJsonAsync("/api/admin/products",
+            new { categoryId = cat.Id, name = "Simit", priceKurus = 1000, isActive = true, sortOrder = 0 });
+        Assert.Equal("birim_gecersiz", await noUnit.ProblemCode());
+
+        var noActive = await owner.PostAsJsonAsync("/api/admin/products",
+            new { categoryId = cat.Id, name = "Simit", unitType = "Piece", priceKurus = 1000, sortOrder = 0 });
+        Assert.Equal("aktiflik_gecersiz", await noActive.ProblemCode());
+    }
 }

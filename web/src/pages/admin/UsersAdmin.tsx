@@ -52,6 +52,7 @@ function UserForm({ user, onClose }: { user: UserRow | null; onClose: () => void
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'users'] });
       qc.invalidateQueries({ queryKey: ['auth-status'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
       onClose();
     },
     onError: (e) => setError(e.message),

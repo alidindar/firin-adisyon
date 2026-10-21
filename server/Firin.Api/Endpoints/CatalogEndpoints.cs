@@ -12,7 +12,7 @@ public static class CatalogEndpoints
     public record CategoryDto(int Id, string Name, int SortOrder, int ProductCount);
     public record CatalogCategoryDto(int Id, string Name, List<ProductDto> Products);
     public record CategoryInput(string Name, int SortOrder);
-    public record ProductInput(int CategoryId, string Name, UnitType UnitType, long PriceKurus, bool IsActive, int SortOrder);
+    public record ProductInput(int CategoryId, string Name, UnitType? UnitType, long PriceKurus, bool? IsActive, int SortOrder);
 
     public static ProductDto ToDto(this Product p) => new(p.Id, p.CategoryId, p.Name, p.UnitType, p.PriceKurus,
         p.PhotoFile is null ? null : $"/photos/{p.PhotoFile}", p.IsActive, p.SortOrder);
@@ -98,13 +98,14 @@ public static class CatalogEndpoints
     {
         if (!await db.Categories.AnyAsync(c => c.Id == input.CategoryId))
             throw new DomainException("kategori_yok", "Kategori bulunamadı.");
-        if (!Enum.IsDefined(input.UnitType))
+        if (input.UnitType is not { } unitType || !Enum.IsDefined(unitType))
             throw new DomainException("birim_gecersiz", "Satış birimi geçersiz.");
+        var isActive = input.IsActive ?? throw new DomainException("aktiflik_gecersiz", "Aktiflik durumu belirtilmeli.");
         p.CategoryId = input.CategoryId;
         p.Name = Validate.Name(input.Name);
-        p.UnitType = input.UnitType;
+        p.UnitType = unitType;
         p.PriceKurus = Validate.Price(input.PriceKurus);
-        p.IsActive = input.IsActive;
+        p.IsActive = isActive;
         p.SortOrder = input.SortOrder;
     }
 }

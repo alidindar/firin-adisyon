@@ -52,6 +52,6 @@ public static class PhotoEndpoints
     private static void DeleteFile(FirinPaths paths, string? name)
     {
         if (name is null) return;
-        try { File.Delete(Path.Combine(paths.PhotosDir, name)); } catch (IOException) { }
+        try { File.Delete(Path.Combine(paths.PhotosDir, name)); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 }

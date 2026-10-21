@@ -8,7 +8,7 @@ namespace Firin.Api.Endpoints;
 public static class TableAdminEndpoints
 {
     public record TableDto(int Id, string Name, int SortOrder, bool IsActive);
-    public record TableInput(string Name, int SortOrder, bool IsActive);
+    public record TableInput(string Name, int SortOrder, bool? IsActive);
 
     private static TableDto ToDto(DiningTable t) => new(t.Id, t.Name, t.SortOrder, t.IsActive);
 
@@ -22,7 +22,8 @@ public static class TableAdminEndpoints
 
         g.MapPost("/", async (TableInput input, AppDb db) =>
         {
-            var t = new DiningTable { Name = await UniqueNameAsync(db, input.Name, null), SortOrder = input.SortOrder, IsActive = input.IsActive };
+            var isActive = RequireActive(input);
+            var t = new DiningTable { Name = await UniqueNameAsync(db, input.Name, null), SortOrder = input.SortOrder, IsActive = isActive };
             db.Tables.Add(t);
             await db.SaveChangesAsync();
             return ToDto(t);
@@ -31,16 +32,20 @@ public static class TableAdminEndpoints
         g.MapPut("/{id:int}", async (int id, TableInput input, AppDb db) =>
         {
             var t = await db.Tables.FindAsync(id) ?? throw Validate.NotFound();
+            var isActive = RequireActive(input);
             t.Name = await UniqueNameAsync(db, input.Name, id);
             t.SortOrder = input.SortOrder;
-            if (t.IsActive && !input.IsActive &&
+            if (t.IsActive && !isActive &&
                 await db.Orders.AnyAsync(o => o.TableId == id && o.Status == OrderStatus.Open))
                 throw new DomainException("masa_acik", "Bu masada açık hesap var. Önce hesabı kapatın.", StatusCodes.Status409Conflict);
-            t.IsActive = input.IsActive;
+            t.IsActive = isActive;
             await db.SaveChangesAsync();
             return ToDto(t);
         });
     }
+
+    private static bool RequireActive(TableInput input) =>
+        input.IsActive ?? throw new DomainException("aktiflik_gecersiz", "Aktiflik durumu belirtilmeli.");
 
     private static async Task<string> UniqueNameAsync(AppDb db, string? raw, int? selfId)
     {

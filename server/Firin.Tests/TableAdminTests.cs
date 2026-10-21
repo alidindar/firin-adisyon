@@ -57,4 +57,15 @@ public sealed class TableAdminTests : IDisposable
         var staff = await _app.StaffAsync();
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/admin/tables")).StatusCode);
     }
+
+    [Fact]
+    public async Task Table_without_is_active_is_rejected()
+    {
+        var owner = await _app.OwnerAsync();
+        var res = await owner.PostAsJsonAsync("/api/admin/tables", new { name = "Masa 9", sortOrder = 0 });
+        Assert.Equal("aktiflik_gecersiz", await res.ProblemCode());
+        var t = await Seed.TableAsync(owner, "Masa 1");
+        var put = await owner.PutAsJsonAsync($"/api/admin/tables/{t.Id}", new { name = "Masa 1", sortOrder = 0 });
+        Assert.Equal("aktiflik_gecersiz", await put.ProblemCode());
+    }
 }
