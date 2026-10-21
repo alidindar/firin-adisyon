@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Firin.Api.Auth;
 using Firin.Api.Domain;
+using Microsoft.Extensions.DependencyInjection;
 using static Firin.Api.Endpoints.AuthEndpoints;
 
 namespace Firin.Tests;
@@ -93,6 +95,42 @@ public sealed class AuthTests : IDisposable
 
         _app.Db(db => { db.Users.Single(u => u.Name == "Garson").IsActive = false; return db.SaveChanges(); });
         Assert.Equal(HttpStatusCode.Unauthorized, (await staff.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Pin_change_rejects_existing_session()
+    {
+        var staff = await _app.StaffAsync();
+        Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/auth/me")).StatusCode);
+
+        _app.Db(db =>
+        {
+            var hasher = _app.Factory.Services.GetRequiredService<PinHasher>();
+            db.Users.Single(u => u.Name == "Garson").PinHash = hasher.Hash("9999");
+            return db.SaveChanges();
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, (await staff.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Role_change_rejects_existing_session()
+    {
+        var owner = await _app.OwnerAsync();
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync("/api/auth/me")).StatusCode);
+
+        _app.Db(db => { db.Users.Single(u => u.Name == "Sahip").Role = Role.Staff; return db.SaveChanges(); });
+        Assert.Equal(HttpStatusCode.Unauthorized, (await owner.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Inactive_user_cannot_log_in()
+    {
+        var id = _app.SeedUser("Garson", "5678", Role.Staff);
+        _app.Db(db => { db.Users.Single(u => u.Id == id).IsActive = false; return db.SaveChanges(); });
+
+        var res = await _app.Client.PostAsJsonAsync("/api/auth/login", new { userId = id, pin = "5678" });
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.Equal("kullanici_yok", await res.ProblemCode());
     }
 
     [Fact]
