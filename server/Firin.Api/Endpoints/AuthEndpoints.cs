@@ -48,6 +48,7 @@ public static class AuthEndpoints
         {
             var user = await db.Users.FirstOrDefaultAsync(u => u.Id == req.UserId && u.IsActive)
                 ?? throw new DomainException("kullanici_yok", "Kullanıcı bulunamadı.", StatusCodes.Status404NotFound);
+            using var _ = await lockout.AcquireAsync(user.Id);
             if (lockout.RemainingLock(user.Id) is { } left)
                 throw new DomainException("kilitli",
                     $"Çok fazla yanlış deneme. {Math.Ceiling(left.TotalSeconds)} saniye sonra tekrar deneyin.",

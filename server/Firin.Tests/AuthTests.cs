@@ -102,4 +102,16 @@ public sealed class AuthTests : IDisposable
         await owner.PostAsync("/api/auth/logout", null);
         Assert.Equal(HttpStatusCode.Unauthorized, (await owner.GetAsync("/api/auth/me")).StatusCode);
     }
+
+    [Fact]
+    public async Task Parallel_wrong_pins_keep_the_lock()
+    {
+        var id = _app.SeedUser("Garson", "5678", Role.Staff);
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(_ =>
+            _app.NewClient().PostAsJsonAsync("/api/auth/login", new { userId = id, pin = "0000" })));
+
+        var res = await _app.Client.PostAsJsonAsync("/api/auth/login", new { userId = id, pin = "5678" });
+        Assert.Equal((HttpStatusCode)423, res.StatusCode);
+        Assert.Equal("kilitli", await res.ProblemCode());
+    }
 }
