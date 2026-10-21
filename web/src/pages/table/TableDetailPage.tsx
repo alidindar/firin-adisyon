@@ -79,7 +79,7 @@ export function TableDetailPage() {
         <section className="pane-order">
           <OrderPanel
             table={t}
-            disabled={disabled}
+            disabled={disabled || change.isPending}
             onSetQuantity={(i, q) => change.mutate(() => ordersApi.setQuantity(i.id, q))}
             onVoid={(i) => change.mutate(() => ordersApi.voidItem(i.id))}
             onEditGram={(i) => { setError(null); setGram({ item: i }); }}
