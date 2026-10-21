@@ -81,7 +81,7 @@ public sealed class TestApp : IDisposable
         Client.Dispose();
         Factory.Dispose();
         SqliteConnection.ClearAllPools();
-        try { Directory.Delete(DataDir, recursive: true); } catch (IOException) { }
+        try { Directory.Delete(DataDir, recursive: true); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 }
 
