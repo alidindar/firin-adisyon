@@ -1,11 +1,15 @@
 using System.Text.Json.Serialization;
 using Firin.Api;
+using Firin.Api.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService(o => o.ServiceName = "FirinAdisyon");
 
 builder.Services.AddSingleton<FirinPaths>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddDbContext<AppDb>((sp, o) =>
+    o.UseSqlite(sp.GetRequiredService<FirinPaths>().ConnectionString));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -13,6 +17,8 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 var app = builder.Build();
 app.Services.GetRequiredService<FirinPaths>(); // klasörleri hemen oluştur
+using (var scope = app.Services.CreateScope())
+    scope.ServiceProvider.GetRequiredService<AppDb>().Database.Migrate();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

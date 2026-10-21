@@ -2,7 +2,9 @@ bin/
 obj/
 node_modules/
 dist/
-data/
+/data/
+photos/
+backups/
 *.db
 *.db-*
 publish/
