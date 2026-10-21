@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Firin.Api.Domain;
 using Firin.Api.Orders;
+using Firin.Api.Realtime;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using static Firin.Api.Endpoints.CatalogEndpoints;
 using static Firin.Api.Endpoints.TableAdminEndpoints;
 
@@ -304,6 +307,70 @@ public sealed class PaymentTests : IDisposable
             Assert.False(payTask.IsCompleted);
         }
         Assert.Equal(HttpStatusCode.OK, (await payTask).StatusCode);
+    }
+
+    [Fact]
+    public async Task Repeated_payment_with_same_expected_remaining_is_recorded_once()
+    {
+        await SetupAsync();
+        var first = await Pay(new { method = "Cash", amountKurus = 5000, expectedRemainingKurus = 18000 });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var second = await Pay(new { method = "Cash", amountKurus = 5000, expectedRemainingKurus = 18000 });
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal("hesap_degisti", await second.ProblemCode());
+        Assert.Equal(1, _app.Db(db => db.Payments.Count()));
+    }
+
+    [Fact]
+    public async Task Stale_expected_remaining_is_rejected_without_writing()
+    {
+        await SetupAsync();
+        var res = await Pay(new { method = "Card", amountKurus = 5000, expectedRemainingKurus = 17000 });
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Equal("hesap_degisti", await res.ProblemCode());
+        Assert.Equal(0, _app.Db(db => db.Payments.Count()));
+    }
+
+    [Fact]
+    public async Task Matching_expected_remaining_is_accepted()
+    {
+        await SetupAsync();
+        var r = await (await Pay(new { method = "Cash", amountKurus = 18000, expectedRemainingKurus = 18000 })).ReadAs<PayResultDto>();
+        Assert.True(r.Closed);
+    }
+
+    [Fact]
+    public async Task Payment_broadcast_failure_still_returns_ok()
+    {
+        await SetupAsync();
+        var id = _app.SeedUser("Kasa", "1111", Role.Staff);
+        using var factory = _app.Factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IRealtime>();
+            s.AddSingleton<IRealtime, RealtimeTests.ThrowingRealtime>();
+        }));
+        using var client = factory.CreateClient();
+        (await client.PostAsJsonAsync("/api/auth/login", new { userId = id, pin = "1111" })).EnsureSuccessStatusCode();
+
+        var res = await Pay(new { method = "Cash", amountKurus = 18000 }, client);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.True((await res.ReadAs<PayResultDto>()).Closed);
+        Assert.Equal(1, _app.Db(db => db.Payments.Count()));
+        Assert.Equal(OrderStatus.Closed, _app.Db(db => db.Orders.Single().Status));
+    }
+
+    [Fact]
+    public async Task Payment_is_broadcast()
+    {
+        await SetupAsync();
+        var id = _app.SeedUser("Kasa", "1111", Role.Staff);
+        await using var hub = await _app.HubAsync(await _app.LoginCookieAsync(id, "1111"));
+        var got = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        hub.On<int>("TableChanged", t => got.TrySetResult(t));
+
+        Assert.Equal(HttpStatusCode.OK, (await Pay(new { method = "Cash", amountKurus = 5000 })).StatusCode);
+        Assert.Equal(_table.Id, await got.Task.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
     [Fact]

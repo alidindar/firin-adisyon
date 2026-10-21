@@ -13,8 +13,9 @@ public record OrderDto(int Id, OrderStatus Status, DateTime OpenedAt, long Total
 /// <summary>Order: masanın açık adisyonu; yoksa null.</summary>
 public record TableDetailDto(int Id, string Name, OrderDto? Order);
 
-/// <summary>Tutar ya da kalem listesinden tam olarak biri verilir. Method zorunlu (eksikse varsayılan Cash olmasın).</summary>
-public record PayRequest(PaymentMethod? Method, long? AmountKurus, List<int>? ItemIds);
+/// <summary>Tutar ya da kalem listesinden tam olarak biri verilir. Method zorunlu (eksikse varsayılan Cash olmasın).
+/// ExpectedRemainingKurus verilirse ve güncel kalanla farklıysa ödeme yazılmaz (kaybolan yanıt sonrası tekrar / bayat ekran).</summary>
+public record PayRequest(PaymentMethod? Method, long? AmountKurus, List<int>? ItemIds, long? ExpectedRemainingKurus = null);
 
 public record PayResultDto(int OrderId, bool Closed, PaymentDto Payment, TableDetailDto Table);
 

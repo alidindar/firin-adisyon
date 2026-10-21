@@ -26,6 +26,10 @@ public sealed class PaymentService(AppDb db, OrderService orders, OrderLock orde
             order = await orders.LoadOpenOrderAsync(tableId)
                 ?? throw new DomainException("hesap_yok", "Bu masada açık hesap yok.", StatusCodes.Status404NotFound);
 
+            if (req.ExpectedRemainingKurus is { } expected && expected != OrderMath.Remaining(order))
+                throw new DomainException("hesap_degisti",
+                    "Hesap başka bir cihazda değişti. Güncel tutarı kontrol edip tekrar deneyin.", StatusCodes.Status409Conflict);
+
             List<OrderItem> items = [];
             long amount;
             if (byItems)

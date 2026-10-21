@@ -65,6 +65,8 @@ export interface PayBody {
   method: PaymentMethod;
   amountKurus?: number;
   itemIds?: number[];
+  /** Kullanıcının ödeme tutarını seçerken gördüğü kalan; sunucudaki farklıysa 409 hesap_degisti. */
+  expectedRemainingKurus?: number;
 }
 
 export const ordersApi = {

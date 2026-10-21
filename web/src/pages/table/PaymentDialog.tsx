@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { ordersApi, type PayBody, type PayResult, type TableDetail } from '../../api/orders';
@@ -8,7 +8,7 @@ import { cashSuggestions, changeDue, remainingShares } from '../../lib/split';
 
 type Mode = 'full' | 'amount' | 'split' | 'items';
 /** Ödenecek şey: tutar ya da kalemler. */
-type Target = { amountKurus: number; itemIds?: number[] };
+type Target = { amountKurus: number; itemIds?: number[]; expectedRemainingKurus: number };
 
 interface Props {
   table: TableDetail;
@@ -37,6 +37,7 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   // isPending güncellenmeden önceki kısa aralıkta çift dokunuşu engeller.
   const inFlight = useRef(false);
 
+  const qc = useQueryClient();
   const pay = useMutation({
     mutationFn: (v: { body: PayBody; change: number; mode: Mode }) => ordersApi.pay(table.id, v.body),
     // Para işlemi: asla otomatik yeniden denenmez (çift tahsilat riski) ve
@@ -53,13 +54,17 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
       onPaid(r);
       if (r.closed) setClosed({ orderId: r.orderId, change: v.change });
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => {
+      setError(e.message);
+      // Hesap değişmiş ya da yanıt kaybolmuş olabilir: güncel kalan tutarı göster.
+      void qc.invalidateQueries({ queryKey: ['table', table.id] });
+    },
   });
 
   // Hesap başka cihazda kapandıysa diyalog sessizce kaybolmasın, kapansın.
   useEffect(() => {
-    if (!table.order && !closed) onClose();
-  }, [table.order, closed, onClose]);
+    if (!table.order && !closed && !pay.isPending) onClose();
+  }, [table.order, closed, pay.isPending, onClose]);
 
   if (closed) return <ClosedSummary orderId={closed.orderId} change={closed.change} onClose={onClose} />;
 
@@ -74,7 +79,11 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
     if (inFlight.current || busy) return;
     inFlight.current = true;
     pay.mutate({
-      body: t.itemIds ? { method, itemIds: t.itemIds } : { method, amountKurus: t.amountKurus },
+      body: {
+        method,
+        ...(t.itemIds ? { itemIds: t.itemIds } : { amountKurus: t.amountKurus }),
+        expectedRemainingKurus: t.expectedRemainingKurus,
+      },
       change,
       mode,
     });
@@ -84,11 +93,11 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   let body: ReactNode = null;
 
   if (mode === 'full') {
-    target = { amountKurus: remaining };
+    target = { amountKurus: remaining, expectedRemainingKurus: remaining };
     body = <p className="pay-due">Kalan hesap: <strong>{formatKurus(remaining)}</strong></p>;
   } else if (mode === 'amount') {
     const k = parseTlToKurus(amountText);
-    if (k !== null && k > 0 && k <= remaining) target = { amountKurus: k };
+    if (k !== null && k > 0 && k <= remaining) target = { amountKurus: k, expectedRemainingKurus: remaining };
     body = (
       <label className="form">
         Alınacak tutar (₺) — kalan {formatKurus(remaining)}
@@ -99,7 +108,7 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   } else if (mode === 'split') {
     const shares = remainingShares(remaining, people, paidShares);
     const left = shares.length;
-    target = shares.length ? { amountKurus: shares[0] } : null;
+    target = shares.length ? { amountKurus: shares[0], expectedRemainingKurus: remaining } : null;
     body = (
       <div className="split">
         <div className="stepper">
@@ -118,7 +127,7 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
     const unpaid = order.items.filter((i) => !i.isPaid);
     const picked = unpaid.filter((i) => selected.includes(i.id));
     const sum = picked.reduce((s, i) => s + i.lineTotalKurus, 0);
-    if (picked.length) target = { amountKurus: sum, itemIds: picked.map((i) => i.id) };
+    if (picked.length) target = { amountKurus: sum, itemIds: picked.map((i) => i.id), expectedRemainingKurus: remaining };
     body = (
       <>
         <ul className="pick-items">

@@ -70,7 +70,7 @@ public sealed class RealtimeTests : IDisposable
         Assert.Equal(0, count);
     }
 
-    private sealed class ThrowingRealtime : IRealtime
+    internal sealed class ThrowingRealtime : IRealtime
     {
         public Task TableChanged(int tableId) => throw new InvalidOperationException("yayın bozuk");
         public Task TablesChanged() => throw new InvalidOperationException("yayın bozuk");
