@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { ordersApi, type PayBody, type PayResult, type TableDetail } from '../../api/orders';
 import { Modal } from '../../components/Modal';
 import { formatKurus, formatQuantity, parseTlToKurus } from '../../lib/format';
-import { cashSuggestions, changeDue, splitEqually } from '../../lib/split';
+import { cashSuggestions, changeDue, remainingShares } from '../../lib/split';
 
 type Mode = 'full' | 'amount' | 'split' | 'items';
 /** Ödenecek şey: tutar ya da kalemler. */
@@ -34,16 +34,22 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState<{ orderId: number; change: number } | null>(null);
 
+  // isPending güncellenmeden önceki kısa aralıkta çift dokunuşu engeller.
+  const inFlight = useRef(false);
+
   const pay = useMutation({
-    mutationFn: (v: { body: PayBody; change: number }) => ordersApi.pay(table.id, v.body),
-    // Para işlemi: asla otomatik yeniden denenmez (çift tahsilat riski).
+    mutationFn: (v: { body: PayBody; change: number; mode: Mode }) => ordersApi.pay(table.id, v.body),
+    // Para işlemi: asla otomatik yeniden denenmez (çift tahsilat riski) ve
+    // çevrimdışıyken kuyrukta bekleyip sonradan kendiliğinden gitmez; hata olarak görünür.
     retry: false,
+    networkMode: 'always',
+    onSettled: () => { inFlight.current = false; },
     onSuccess: (r, v) => {
       setError(null);
       setCashFor(null);
       setSelected([]);
       setAmountText('');
-      if (mode === 'split') setPaidShares((n) => n + 1);
+      if (v.mode === 'split') setPaidShares((n) => n + 1);
       onPaid(r);
       if (r.closed) setClosed({ orderId: r.orderId, change: v.change });
     },
@@ -61,12 +67,18 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   if (!order) return null;
   const remaining = order.remainingKurus;
   const busy = disabled || pay.isPending;
+  // Bekleyen ödeme varken diyalog kapanmasın: yeniden açılıp ikinci istek gitmesin.
+  const safeClose = () => { if (!pay.isPending) onClose(); };
 
-  const send = (method: 'Cash' | 'Card', t: Target, change = 0) =>
+  const send = (method: 'Cash' | 'Card', t: Target, change = 0) => {
+    if (inFlight.current || busy) return;
+    inFlight.current = true;
     pay.mutate({
       body: t.itemIds ? { method, itemIds: t.itemIds } : { method, amountKurus: t.amountKurus },
       change,
+      mode,
     });
+  };
 
   let target: Target | null = null;
   let body: ReactNode = null;
@@ -85,8 +97,8 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
       </label>
     );
   } else if (mode === 'split') {
-    const left = Math.max(people - paidShares, 1);
-    const shares = splitEqually(remaining, left);
+    const shares = remainingShares(remaining, people, paidShares);
+    const left = shares.length;
     target = shares.length ? { amountKurus: shares[0] } : null;
     body = (
       <div className="split">
@@ -104,8 +116,9 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
     );
   } else {
     const unpaid = order.items.filter((i) => !i.isPaid);
-    const sum = unpaid.filter((i) => selected.includes(i.id)).reduce((s, i) => s + i.lineTotalKurus, 0);
-    if (selected.length) target = { amountKurus: sum, itemIds: selected };
+    const picked = unpaid.filter((i) => selected.includes(i.id));
+    const sum = picked.reduce((s, i) => s + i.lineTotalKurus, 0);
+    if (picked.length) target = { amountKurus: sum, itemIds: picked.map((i) => i.id) };
     body = (
       <>
         <ul className="pick-items">
@@ -126,19 +139,19 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   }
 
   return (
-    <Modal title={`${table.name} · Ödeme`} onClose={onClose}>
+    <Modal title={`${table.name} · Ödeme`} onClose={safeClose}>
       {cashFor ? (
-        <CashStep target={cashFor} busy={busy} onBack={() => setCashFor(null)} onConfirm={(change) => send('Cash', cashFor, change)} />
+        <CashStep target={cashFor} busy={busy} onBack={() => { setCashFor(null); setError(null); }} onConfirm={(change) => send('Cash', cashFor, change)} />
       ) : (
         <>
           <div className="chips">
             {modes.map(([m, label]) => (
-              <button key={m} className={m === mode ? 'chip active' : 'chip'} onClick={() => { setMode(m); setError(null); }}>{label}</button>
+              <button key={m} className={m === mode ? 'chip active' : 'chip'} disabled={busy} onClick={() => { setMode(m); setError(null); }}>{label}</button>
             ))}
           </div>
           {body}
           <div className="pay-buttons">
-            <button className="primary" disabled={!target || busy} onClick={() => setCashFor(target)}>
+            <button className="primary" disabled={!target || busy} onClick={() => { setError(null); setCashFor(target); }}>
               Nakit{target ? ` · ${formatKurus(target.amountKurus)}` : ''}
             </button>
             <button className="primary" disabled={!target || busy} onClick={() => target && send('Card', target)}>

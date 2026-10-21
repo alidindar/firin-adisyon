@@ -22,3 +22,8 @@ export function cashSuggestions(amount: number): number[] {
   }
   return [...set].sort((a, b) => a - b).slice(0, 4);
 }
+
+/** Kişi başı ödemede kalan payları verir; ilki sıradaki kişinindir. */
+export function remainingShares(remaining: number, people: number, paidShares: number): number[] {
+  return splitEqually(remaining, Math.max(people - paidShares, 1));
+}

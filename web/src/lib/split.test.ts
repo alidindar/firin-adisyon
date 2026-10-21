@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cashSuggestions, changeDue, splitEqually } from './split';
+import { cashSuggestions, changeDue, remainingShares, splitEqually } from './split';
 
 describe('splitEqually', () => {
   it('kuruş artığını son kişiye ekler', () => {
@@ -28,5 +28,16 @@ describe('cashSuggestions', () => {
     expect(cashSuggestions(18000)).toEqual([18000, 20000, 50000, 100000]);
     expect(cashSuggestions(20000)).toEqual([20000, 50000, 100000, 200000]);
     expect(cashSuggestions(4250)).toEqual([4250, 5000, 10000, 20000]);
+  });
+});
+
+describe('remainingShares', () => {
+  it('ödeyenleri düşüp kalanı kalan kişilere böler', () => {
+    expect(remainingShares(10000, 3, 0)).toEqual([3333, 3333, 3334]);
+    expect(remainingShares(6667, 3, 1)).toEqual([3333, 3334]);
+    expect(remainingShares(3334, 3, 2)).toEqual([3334]);
+  });
+  it('herkes ödemiş görünse bile en az bir pay kalır', () => {
+    expect(remainingShares(500, 2, 5)).toEqual([500]);
   });
 });

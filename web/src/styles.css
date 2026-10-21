@@ -182,6 +182,8 @@ button.wide { width: 100%; margin-top: 12px; }
 .gram-total { font-size: 1.35rem; color: var(--accent); }
 .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 0 auto 12px; }
 
+.detail-head .pay-compact { display: none; align-items: center; min-height: 48px; }
+
 @media (max-width: 760px) {
   .detail-panes { grid-template-columns: minmax(0, 1fr); }
   .pane-order { position: static; max-height: none; }
@@ -191,7 +193,6 @@ button.wide { width: 100%; margin-top: 12px; }
   .detail-panes.show-order .pane-products, .detail-panes.show-products .pane-order { display: none; }
 }
 
-.detail-head .pay-compact { display: none; align-items: center; min-height: 48px; }
 .pay-due { font-size: 1.1rem; margin: 12px 0; }
 .pay-due strong { font-size: 1.35rem; color: var(--accent); }
 .pay-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
