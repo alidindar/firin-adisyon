@@ -1,0 +1,82 @@
+:root {
+  --bg: #faf6f0;
+  --surface: #ffffff;
+  --text: #2b2118;
+  --muted: #7a6a5a;
+  --accent: #b5651d;
+  --accent-text: #ffffff;
+  --border: #e6dccf;
+  --danger: #b3261e;
+  --ok: #2e7d32;
+  --busy: #fff1e0;
+  --radius: 12px;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); -webkit-tap-highlight-color: transparent; }
+h1 { font-size: 1.5rem; margin: 0 0 8px; }
+
+button {
+  font: inherit;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button.link { border: none; background: none; text-decoration: underline; color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+input, select {
+  font: inherit;
+  font-size: 16px; /* iOS'ta odaklanınca yakınlaştırmayı önler */
+  min-height: 48px;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.center { display: grid; place-items: center; min-height: 100dvh; padding: 16px; text-align: center; }
+.error { color: var(--danger); }
+.page { max-width: 1200px; margin: 0 auto; }
+
+.form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+
+.login { max-width: 420px; margin: 0 auto; padding: 32px 16px; text-align: center; display: flex; flex-direction: column; gap: 16px; }
+.user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.user-btn { min-height: 72px; font-size: 1.1rem; }
+
+.pin { display: flex; flex-direction: column; gap: 16px; }
+.pin-dots { display: flex; gap: 12px; justify-content: center; }
+.pin-dots span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); }
+.pin-dots span.filled { background: var(--accent); }
+.pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 300px; margin: 0 auto; }
+.pinpad button { min-height: 64px; font-size: 1.5rem; }
+
+.shell-header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 16px; padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.shell-header nav { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; }
+.shell-header nav a {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px;
+  border-radius: var(--radius); color: var(--text); text-decoration: none; white-space: nowrap;
+}
+.shell-header nav a.active { background: var(--busy); color: var(--accent); font-weight: 600; }
+.shell-user { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+main { padding: 16px; }

@@ -20,4 +20,11 @@ public sealed class HealthTests : IDisposable
     {
         Assert.True(Directory.Exists(Path.Combine(_app.DataDir, "photos")));
     }
+
+    [Fact]
+    public async Task Unknown_api_route_is_404_not_spa()
+    {
+        var res = await _app.Client.GetAsync("/api/olmayan-yol");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
 }

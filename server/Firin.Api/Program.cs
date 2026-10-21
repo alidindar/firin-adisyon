@@ -23,6 +23,8 @@ app.Services.GetRequiredService<FirinPaths>(); // klasörleri hemen oluştur
 using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<AppDb>().Database.Migrate();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
@@ -31,6 +33,8 @@ app.UseAuthorization();
 var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapAuthEndpoints();
+api.MapFallback(() => Results.NotFound());
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
