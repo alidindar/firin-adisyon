@@ -22,6 +22,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRealtime, SignalRRealtime>();
 builder.Services.AddSingleton<OrderLock>();
 builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<PaymentService>();
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 

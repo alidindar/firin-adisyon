@@ -52,7 +52,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
     {
         using (await orderLock.AcquireAsync())
             await AddItemCoreAsync(tableId, productId, quantity, userId);
-        await NotifyAsync(tableId);
+        await NotifyTableChangedAsync(tableId);
         return await GetTableAsync(tableId);
     }
 
@@ -129,7 +129,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         int tableId;
         using (await orderLock.AcquireAsync())
             tableId = await SetQuantityCoreAsync(itemId, quantity, userId);
-        await NotifyAsync(tableId);
+        await NotifyTableChangedAsync(tableId);
         return await GetTableAsync(tableId);
     }
 
@@ -151,7 +151,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         int tableId;
         using (await orderLock.AcquireAsync())
             tableId = await VoidItemCoreAsync(itemId, userId);
-        await NotifyAsync(tableId);
+        await NotifyTableChangedAsync(tableId);
         return await GetTableAsync(tableId);
     }
 
@@ -191,10 +191,18 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
     }
 
     // Kayıt tamamlandıktan sonra yayın hatası istemciye 500 olarak dönmesin (tekrar denemesin).
-    private async Task NotifyAsync(int tableId)
+    public async Task NotifyTableChangedAsync(int tableId)
     {
         try { await realtime.TableChanged(tableId); }
         catch (Exception e) { log.LogWarning(e, "Masa değişikliği yayını gönderilemedi."); }
+    }
+
+    public async Task<OrderDto> GetOrderAsync(int orderId)
+    {
+        var order = await db.Orders.AsNoTracking().Include(o => o.Items).Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.Id == orderId)
+            ?? throw new DomainException("adisyon_yok", "Adisyon bulunamadı.", StatusCodes.Status404NotFound);
+        return await ToDtoAsync(order);
     }
 
     private async Task<(Order, OrderItem)> LoadEditableItemAsync(int itemId)
@@ -219,7 +227,7 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
                 "Bu hesaptan ödeme alındı; toplam, ödenen tutarın altına düşemez.", StatusCodes.Status409Conflict);
     }
 
-    private async Task<OrderDto> ToDtoAsync(Order o)
+    public async Task<OrderDto> ToDtoAsync(Order o)
     {
         var userIds = o.Items.Select(i => i.AddedById).Concat(o.Payments.Select(p => p.UserId)).Distinct().ToList();
         var names = await db.Users.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name);
