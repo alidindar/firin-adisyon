@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/server/">
+    <Project Path="server/Firin.Api/Firin.Api.csproj" />
+    <Project Path="server/Firin.Tests/Firin.Tests.csproj" />
+  </Folder>
+</Solution>
