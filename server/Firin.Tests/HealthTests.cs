@@ -36,4 +36,14 @@ public sealed class HealthTests : IDisposable
         Assert.Equal("text/html", res.Content.Headers.ContentType?.MediaType);
         Assert.Contains("<title>test</title>", await res.Content.ReadAsStringAsync());
     }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/masa/5")]
+    public async Task Index_html_is_not_cached(string path)
+    {
+        var res = await _app.Client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.True(res.Headers.CacheControl?.NoCache);
+    }
 }
