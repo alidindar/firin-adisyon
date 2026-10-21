@@ -16,6 +16,8 @@ public sealed class PaymentService(AppDb db, OrderService orders, OrderLock orde
 
         Order order;
         Payment payment;
+        string userName;
+        TableDetailDto table;
         // Ortak OrderLock: ödeme, miktar değiştirme ve iptal ile birlikte sıralanır. Kilit tutulurken
         // OrderService'in kilit alan metotları (AddItem/SetQuantity/VoidItem) çağrılmaz.
         using (await orderLock.AcquireAsync())
@@ -39,9 +41,10 @@ public sealed class PaymentService(AppDb db, OrderService orders, OrderLock orde
             else
             {
                 amount = req.AmountKurus!.Value;
-                if (amount <= 0) throw new DomainException("tutar_gecersiz", "Tutar 0'dan büyük olmalı.");
             }
 
+            // Ödeme en az 1 kuruş olur; yuvarlama yüzünden 0 kuruşa düşen gram kalemleri de buraya takılır.
+            if (amount <= 0) throw new DomainException("tutar_gecersiz", "Tutar 0'dan büyük olmalı.");
             if (amount > OrderMath.Remaining(order))
                 throw new DomainException("tutar_fazla", "Tutar kalan hesaptan fazla.", StatusCodes.Status409Conflict);
 
@@ -51,14 +54,17 @@ public sealed class PaymentService(AppDb db, OrderService orders, OrderLock orde
             foreach (var i in items) i.PaymentId = payment.Id;
             orders.CloseIfSettled(order, userId);
             await db.SaveChangesAsync();
+
+            // Yanıt için gereken her şey commit'ten ÖNCE okunur (aynı bağlantı kendi yazdıklarını görür):
+            // commit en son başarısız olabilecek adımdır, sonrasında okuma hatası kayıtlı ödemeyi 500'e çevirmez.
+            userName = (await db.Users.FindAsync(userId))?.Name ?? "?";
+            table = await orders.GetTableAsync(tableId);
             await tx.CommitAsync();
         }
 
         // Kayıt tamamlandı; yayın hatası 500'e dönüşüp istemcinin yeniden ödeme denemesine yol açmamalı.
         await orders.NotifyTableChangedAsync(tableId);
-        var userName = (await db.Users.FindAsync(userId))?.Name ?? "?";
         return new PayResultDto(order.Id, order.Status == OrderStatus.Closed,
-            new PaymentDto(payment.Id, payment.AmountKurus, payment.Method, payment.PaidAt, userName),
-            await orders.GetTableAsync(tableId));
+            new PaymentDto(payment.Id, payment.AmountKurus, payment.Method, payment.PaidAt, userName), table);
     }
 }

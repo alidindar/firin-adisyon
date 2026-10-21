@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Firin.Api.Domain;
 using Firin.Api.Orders;
+using Microsoft.Extensions.DependencyInjection;
 using static Firin.Api.Endpoints.CatalogEndpoints;
 using static Firin.Api.Endpoints.TableAdminEndpoints;
 
@@ -12,6 +13,7 @@ public sealed class PaymentTests : IDisposable
     private readonly TestApp _app = new();
     public void Dispose() => _app.Dispose();
 
+    private HttpClient _owner = null!;
     private HttpClient _staff = null!;
     private TableDto _table = null!;
     private ProductDto _tea = null!;     // 15 ₺ / adet
@@ -20,7 +22,7 @@ public sealed class PaymentTests : IDisposable
     /// <summary>Masa 1: 2 çay (30 ₺) + 250 g kurabiye (150 ₺) = 180 ₺</summary>
     private async Task<TableDetailDto> SetupAsync()
     {
-        var owner = await _app.OwnerAsync();
+        var owner = _owner = await _app.OwnerAsync();
         var cat = await Seed.CategoryAsync(owner, "Genel");
         _tea = await Seed.ProductAsync(owner, cat.Id, "Çay", UnitType.Piece, 1500);
         _cookie = await Seed.ProductAsync(owner, cat.Id, "Tuzlu kurabiye", UnitType.Gram, 60000);
@@ -222,6 +224,86 @@ public sealed class PaymentTests : IDisposable
 
         Assert.Equal("hesap_kapali", await (await _staff.PutAsJsonAsync($"/api/items/{teaLine.Id}", new { quantity = 1 })).ProblemCode());
         Assert.Equal("hesap_kapali", await (await _staff.DeleteAsync($"/api/items/{teaLine.Id}")).ProblemCode());
+    }
+
+    [Fact]
+    public async Task Zero_kurus_line_cannot_be_paid_by_item()
+    {
+        await SetupAsync();
+        var cat = await Seed.CategoryAsync(_owner, "Ucuz");
+        var cheap = await Seed.ProductAsync(_owner, cat.Id, "Tuz", UnitType.Gram, 400); // 1 g = 0,4 kuruş -> 0
+        var d = await (await _staff.PostAsJsonAsync($"/api/tables/{_table.Id}/items", new { productId = cheap.Id, quantity = 1 })).ReadAs<TableDetailDto>();
+        var line = d.Order!.Items.Single(i => i.ProductId == cheap.Id);
+        Assert.Equal(0, line.LineTotalKurus);
+
+        Assert.Equal("tutar_gecersiz", await (await Pay(new { method = "Cash", itemIds = new[] { line.Id } })).ProblemCode());
+        Assert.Equal(0, _app.Db(db => db.Payments.Count()));
+        Assert.Null(_app.Db(db => db.OrderItems.Single(i => i.Id == line.Id).PaymentId));
+    }
+
+    [Fact]
+    public async Task Voided_item_is_rejected()
+    {
+        var d = await SetupAsync();
+        var teaLine = d.Order!.Items.Single(i => i.ProductId == _tea.Id);
+        await _staff.DeleteAsync($"/api/items/{teaLine.Id}");
+        var res = await Pay(new { method = "Cash", itemIds = new[] { teaLine.Id } });
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.Equal("kalem_yok", await res.ProblemCode());
+    }
+
+    [Fact]
+    public async Task Item_of_another_table_is_rejected()
+    {
+        await SetupAsync();
+        var other = await Seed.TableAsync(_owner, "Masa 2");
+        var od = await (await _staff.PostAsJsonAsync($"/api/tables/{other.Id}/items", new { productId = _tea.Id, quantity = 1 })).ReadAs<TableDetailDto>();
+        Assert.Equal("kalem_yok", await (await Pay(new { method = "Cash", itemIds = new[] { od.Order!.Items[0].Id } })).ProblemCode());
+        Assert.Equal(0, _app.Db(db => db.Payments.Count()));
+    }
+
+    [Fact]
+    public async Task Duplicate_item_ids_are_charged_once()
+    {
+        var d = await SetupAsync();
+        var teaLine = d.Order!.Items.Single(i => i.ProductId == _tea.Id);
+        var r = await (await Pay(new { method = "Cash", itemIds = new[] { teaLine.Id, teaLine.Id } })).ReadAs<PayResultDto>();
+        Assert.Equal(3000, r.Payment.AmountKurus);
+    }
+
+    [Fact]
+    public async Task Selecting_every_item_closes_order()
+    {
+        var d = await SetupAsync();
+        var r = await (await Pay(new { method = "Card", itemIds = d.Order!.Items.Select(i => i.Id).ToArray() })).ReadAs<PayResultDto>();
+        Assert.Equal(18000, r.Payment.AmountKurus);
+        Assert.True(r.Closed);
+        Assert.Null(r.Table.Order);
+    }
+
+    [Fact]
+    public async Task Payment_endpoints_require_a_session()
+    {
+        var d = await SetupAsync();
+        var anon = _app.NewClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anon.GetAsync($"/api/orders/{d.Order!.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await anon.PostAsJsonAsync($"/api/tables/{_table.Id}/payments", new { method = "Cash", amountKurus = 100 })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Payment_waits_for_the_shared_order_lock()
+    {
+        await SetupAsync();
+        var orderLock = _app.Factory.Services.GetRequiredService<OrderLock>();
+        Task<HttpResponseMessage> payTask;
+        using (await orderLock.AcquireAsync())
+        {
+            payTask = Pay(new { method = "Cash", amountKurus = 100 });
+            await Task.Delay(300);
+            Assert.False(payTask.IsCompleted);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await payTask).StatusCode);
     }
 
     [Fact]
