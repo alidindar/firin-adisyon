@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { AdminPage } from '../pages/admin/AdminPage';
 import { TablesPage } from '../pages/TablesPage';
+import { TableDetailPage } from '../pages/table/TableDetailPage';
 import { RealtimeProvider, useConnection } from '../realtime/RealtimeProvider';
 
 export function Shell({ me }: { me: Me }) {
@@ -45,6 +46,7 @@ function ShellLayout({ me }: { me: Me }) {
       <main>
         <Routes>
           <Route path="/" element={<TablesPage />} />
+          <Route path="/masa/:id" element={<TableDetailPage />} />
           {isOwner && <Route path="/yonetim/*" element={<AdminPage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
