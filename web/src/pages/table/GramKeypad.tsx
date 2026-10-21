@@ -36,6 +36,7 @@ export function GramKeypad({ title, pricePerKg, initial, busy, error, onSubmit: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (/^\d$/.test(e.key)) setValue((v) => pressKey(v, e.key));
       else if (e.key === 'Backspace') setValue((v) => pressKey(v, 'back'));
       // Odaktaki düğmede Enter zaten tıklama üretir; çift ekleme olmasın.

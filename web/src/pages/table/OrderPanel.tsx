@@ -43,7 +43,7 @@ export function OrderPanel({ table, disabled, onSetQuantity, onVoid, onEditGram,
                     <>
                       <button aria-label="Bir azalt" disabled={disabled || i.quantity <= 1} onClick={() => onSetQuantity(i, i.quantity - 1)}>−</button>
                       <span className="qty">{i.quantity}</span>
-                      <button aria-label="Bir artır" disabled={disabled} onClick={() => onSetQuantity(i, i.quantity + 1)}>+</button>
+                      <button aria-label="Bir artır" disabled={disabled || i.quantity >= 999} onClick={() => onSetQuantity(i, i.quantity + 1)}>+</button>
                     </>
                   ) : (
                     <button disabled={disabled} onClick={() => onEditGram(i)}>Gramı düzelt</button>

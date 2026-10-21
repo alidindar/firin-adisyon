@@ -145,8 +145,9 @@ button.wide { width: 100%; margin-top: 12px; }
 .detail-head .back { display: inline-flex; align-items: center; min-height: 48px; color: var(--muted); text-decoration: none; }
 .detail-total { font-size: 1.35rem; font-weight: 700; color: var(--accent); }
 
-.detail-panes { display: grid; grid-template-columns: minmax(300px, 2fr) 3fr; gap: 16px; align-items: start; }
-.pane-order { position: sticky; top: 72px; max-height: calc(100dvh - 90px); overflow: auto; }
+.detail-panes { display: grid; grid-template-columns: minmax(300px, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
+.detail-panes > * { min-width: 0; }
+.pane-order { position: sticky; top: calc(var(--shell-top-h, 72px) + 8px); max-height: calc(100dvh - var(--shell-top-h, 72px) - 24px); overflow: auto; }
 .mobile-tabs { display: none; }
 
 .order-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
@@ -158,7 +159,7 @@ button.wide { width: 100%; margin-top: 12px; }
 }
 .order-lines li.paid { opacity: 0.6; }
 .line-main { display: flex; flex-direction: column; min-width: 0; }
-.line-name { font-weight: 600; }
+.line-name { font-weight: 600; overflow-wrap: anywhere; }
 .line-total { white-space: nowrap; }
 .line-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .line-actions button { min-width: 48px; }
@@ -174,7 +175,7 @@ button.wide { width: 100%; margin-top: 12px; }
 .chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .product-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; min-height: 180px; text-align: center; }
-.product-name { font-weight: 600; }
+.product-name { font-weight: 600; overflow-wrap: anywhere; }
 
 .gram-display { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 12px; }
 .gram-value { font-size: 2rem; font-weight: 700; }
@@ -182,7 +183,7 @@ button.wide { width: 100%; margin-top: 12px; }
 .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 0 auto 12px; }
 
 @media (max-width: 760px) {
-  .detail-panes { grid-template-columns: 1fr; }
+  .detail-panes { grid-template-columns: minmax(0, 1fr); }
   .pane-order { position: static; max-height: none; }
   .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .mobile-tabs button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }

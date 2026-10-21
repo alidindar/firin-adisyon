@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
@@ -19,6 +20,20 @@ function ShellLayout({ me }: { me: Me }) {
   const qc = useQueryClient();
   const connection = useConnection();
   const isOwner = me.role === 'Owner';
+  // Yapışkan üst bölümün gerçek yüksekliği; masa detayındaki yapışkan panel buna göre konumlanır.
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty('--shell-top-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--shell-top-h');
+    };
+  }, []);
 
   const logout = async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -28,7 +43,7 @@ function ShellLayout({ me }: { me: Me }) {
 
   return (
     <>
-      <div className="shell-top">
+      <div className="shell-top" ref={topRef}>
         <header className="shell-header">
           <nav>
             <NavLink to="/" end>Masalar</NavLink>

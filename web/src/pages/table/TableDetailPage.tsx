@@ -33,9 +33,20 @@ export function TableDetailPage() {
       setError(null);
       setGram(null);
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => {
+      setError(e.message);
+      // Eski veriden gelen çakışmada (409) ekran güncel hâline dönsün.
+      qc.invalidateQueries({ queryKey: ['table', tableId] });
+    },
   });
 
+  if (!Number.isInteger(tableId))
+    return (
+      <div className="page">
+        <p className="error">Masa bulunamadı.</p>
+        <Link to="/">← Masalara dön</Link>
+      </div>
+    );
   if (table.isPending) return <p>Yükleniyor…</p>;
   if (table.isError)
     return (
@@ -85,7 +96,7 @@ export function TableDetailPage() {
           initial={'item' in gram ? gram.item.quantity : undefined}
           busy={change.isPending || disabled}
           error={error}
-          onClose={() => setGram(null)}
+          onClose={() => { setGram(null); setError(null); }}
           onSubmit={(g) =>
             change.mutate(() =>
               'item' in gram ? ordersApi.setQuantity(gram.item.id, g) : ordersApi.addItem(tableId, gram.product.id, g),
