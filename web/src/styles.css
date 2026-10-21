@@ -118,3 +118,8 @@ section h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--muted); }
 .form label.check, .segmented label { flex-direction: row; align-items: center; gap: 8px; min-height: 48px; font-weight: 400; }
 .photo-field { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .form-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+
+.toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bulk-add { display: flex; align-items: center; gap: 8px; }
+.bulk-add input { width: 80px; }
+.hint { color: var(--muted); margin: 0 0 12px; }
