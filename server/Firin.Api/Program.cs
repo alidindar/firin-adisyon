@@ -4,6 +4,7 @@ using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Endpoints;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService(o => o.ServiceName = "FirinAdisyon");
@@ -19,7 +20,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var app = builder.Build();
-app.Services.GetRequiredService<FirinPaths>(); // klasörleri hemen oluştur
+var paths = app.Services.GetRequiredService<FirinPaths>(); // klasörleri hemen oluştur
 using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<AppDb>().Database.Migrate();
 
@@ -34,6 +35,13 @@ var staticFiles = new StaticFileOptions
 };
 app.UseDefaultFiles();
 app.UseStaticFiles(staticFiles);
+// Dosya adı her yüklemede değiştiği için kalıcı önbellek güvenli.
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(paths.PhotosDir),
+    RequestPath = "/photos",
+    OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
@@ -43,6 +51,7 @@ var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapAuthEndpoints();
 api.MapCatalogEndpoints();
+api.MapPhotoEndpoints();
 api.MapFallback(() => Results.NotFound());
 app.MapFallbackToFile("index.html", staticFiles);
 
