@@ -1,3 +1,4 @@
+using Firin.Api.Realtime;
 using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Domain;
@@ -14,7 +15,8 @@ public static class TableAdminEndpoints
 
     public static void MapTableAdminEndpoints(this IEndpointRouteBuilder api)
     {
-        var g = api.MapGroup("/admin/tables").RequireAuthorization(AuthSetup.OwnerPolicy);
+        var g = api.MapGroup("/admin/tables").RequireAuthorization(AuthSetup.OwnerPolicy)
+            .NotifiesOnChange(r => r.TablesChanged());
 
         g.MapGet("/", async (AppDb db) =>
             (await db.Tables.AsNoTracking().OrderBy(t => t.SortOrder).ThenBy(t => t.Name).ToListAsync())

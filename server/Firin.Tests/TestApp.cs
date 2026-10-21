@@ -5,6 +5,8 @@ using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Domain;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,6 +73,29 @@ public sealed class TestApp : IDisposable
         var res = await c.PostAsJsonAsync("/api/auth/login", new { userId, pin });
         res.EnsureSuccessStatusCode();
         return c;
+    }
+
+    /// <summary>Hub bağlantısı için oturum çerezini elle alır.</summary>
+    public async Task<string> LoginCookieAsync(int userId, string pin)
+    {
+        using var c = Factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var res = await c.PostAsJsonAsync("/api/auth/login", new { userId, pin });
+        res.EnsureSuccessStatusCode();
+        return res.Headers.GetValues("Set-Cookie").First().Split(';')[0];
+    }
+
+    public async Task<HubConnection> HubAsync(string cookie)
+    {
+        var conn = new HubConnectionBuilder()
+            .WithUrl(new Uri(Factory.Server.BaseAddress, "hubs/adisyon"), o =>
+            {
+                o.HttpMessageHandlerFactory = _ => Factory.Server.CreateHandler();
+                o.Transports = HttpTransportType.LongPolling;
+                o.Headers["Cookie"] = cookie;
+            })
+            .Build();
+        await conn.StartAsync();
+        return conn;
     }
 
     public Task<HttpClient> OwnerAsync() => LoginAsync(SeedUser("Sahip", "1234", Role.Owner), "1234");

@@ -1,3 +1,4 @@
+using Firin.Api.Realtime;
 using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Domain;
@@ -35,7 +36,8 @@ public static class CatalogEndpoints
                 .ToList();
         }).RequireAuthorization();
 
-        var cats = api.MapGroup("/admin/categories").RequireAuthorization(AuthSetup.OwnerPolicy);
+        var cats = api.MapGroup("/admin/categories").RequireAuthorization(AuthSetup.OwnerPolicy)
+            .NotifiesOnChange(r => r.CatalogChanged());
 
         cats.MapGet("/", async (AppDb db) => await db.Categories
             .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
@@ -70,7 +72,8 @@ public static class CatalogEndpoints
             return Results.NoContent();
         });
 
-        var products = api.MapGroup("/admin/products").RequireAuthorization(AuthSetup.OwnerPolicy);
+        var products = api.MapGroup("/admin/products").RequireAuthorization(AuthSetup.OwnerPolicy)
+            .NotifiesOnChange(r => r.CatalogChanged());
 
         products.MapGet("/", async (AppDb db) =>
             (await db.Products.AsNoTracking().OrderBy(p => p.SortOrder).ThenBy(p => p.Name).ToListAsync())

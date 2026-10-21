@@ -3,6 +3,7 @@ using Firin.Api;
 using Firin.Api.Auth;
 using Firin.Api.Data;
 using Firin.Api.Endpoints;
+using Firin.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
@@ -16,6 +17,8 @@ builder.Services.AddDbContext<AppDb>((sp, o) =>
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddFirinAuth();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IRealtime, SignalRRealtime>();
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -55,6 +58,7 @@ api.MapPhotoEndpoints();
 api.MapTableAdminEndpoints();
 api.MapUserAdminEndpoints();
 api.MapFallback(() => Results.NotFound());
+app.MapHub<AdisyonHub>("/hubs/adisyon");
 app.MapFallbackToFile("index.html", staticFiles);
 
 app.Run();

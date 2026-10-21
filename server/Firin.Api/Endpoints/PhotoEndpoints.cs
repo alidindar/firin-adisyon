@@ -1,3 +1,4 @@
+using Firin.Api.Realtime;
 using Firin.Api.Auth;
 using Firin.Api.Data;
 
@@ -16,7 +17,8 @@ public static class PhotoEndpoints
 
     public static void MapPhotoEndpoints(this IEndpointRouteBuilder api)
     {
-        var g = api.MapGroup("/admin/products/{id:int}/photo").RequireAuthorization(AuthSetup.OwnerPolicy);
+        var g = api.MapGroup("/admin/products/{id:int}/photo").RequireAuthorization(AuthSetup.OwnerPolicy)
+            .NotifiesOnChange(r => r.CatalogChanged());
 
         // Cookie SameSite=Strict olduğu için antiforgery token'a gerek yok.
         g.MapPost("/", async (int id, IFormFile file, AppDb db, FirinPaths paths) =>
