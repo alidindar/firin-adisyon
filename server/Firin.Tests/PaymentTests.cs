@@ -179,12 +179,25 @@ public sealed class PaymentTests : IDisposable
         var voidTask = other.DeleteAsync($"/api/items/{teaLine.Id}");
         var (pay, voided) = (await payTask, await voidTask);
 
+        // Önce ödeme: tam ödeme adisyonu kapatır, iptal kapalı hesaba takılır (hesap_kapali).
+        // Önce iptal: toplam 150 ₺'ye düşer, 180 ₺'lik ödeme kalanı aşar (tutar_fazla).
+        var (status, voidedAt) = _app.Db(db => (db.Orders.Single().Status,
+            db.OrderItems.Single(i => i.Id == teaLine.Id).VoidedAt));
         if (pay.StatusCode == HttpStatusCode.OK)
-            Assert.Equal("odenenden_az", await voided.ProblemCode());
+        {
+            Assert.Equal(HttpStatusCode.Conflict, voided.StatusCode);
+            Assert.Equal("hesap_kapali", await voided.ProblemCode());
+            Assert.Equal(OrderStatus.Closed, status);
+            Assert.Null(voidedAt);
+        }
         else
         {
             Assert.Equal(HttpStatusCode.OK, voided.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, pay.StatusCode);
             Assert.Equal("tutar_fazla", await pay.ProblemCode());
+            Assert.Equal(OrderStatus.Open, status);
+            Assert.NotNull(voidedAt);
+            Assert.Equal(0, _app.Db(db => db.Payments.Count()));
         }
 
         var (paid, total) = _app.Db(db => (
