@@ -52,6 +52,8 @@ api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapAuthEndpoints();
 api.MapCatalogEndpoints();
 api.MapPhotoEndpoints();
+api.MapTableAdminEndpoints();
+api.MapUserAdminEndpoints();
 api.MapFallback(() => Results.NotFound());
 app.MapFallbackToFile("index.html", staticFiles);
 
