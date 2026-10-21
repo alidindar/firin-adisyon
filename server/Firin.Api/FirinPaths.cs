@@ -5,7 +5,7 @@ public sealed class FirinPaths
     public FirinPaths(IConfiguration config, IHostEnvironment env)
     {
         var dir = config["Firin:DataDir"];
-        DataDir = string.IsNullOrWhiteSpace(dir) ? Path.Combine(env.ContentRootPath, "data") : dir;
+        DataDir = string.IsNullOrWhiteSpace(dir) ? Path.Combine(env.ContentRootPath, "data") : Path.GetFullPath(dir, env.ContentRootPath);
         PhotosDir = Path.Combine(DataDir, "photos");
         BackupsDir = Path.Combine(DataDir, "backups");
         Directory.CreateDirectory(PhotosDir);

@@ -3,8 +3,6 @@ obj/
 node_modules/
 dist/
 /data/
-photos/
-backups/
 *.db
 *.db-*
 publish/
