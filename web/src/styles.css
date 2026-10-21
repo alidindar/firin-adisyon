@@ -123,3 +123,18 @@ section h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--muted); }
 .bulk-add { display: flex; align-items: center; gap: 8px; }
 .bulk-add input { width: 80px; }
 .hint { color: var(--muted); margin: 0 0 12px; }
+
+.muted { color: var(--muted); }
+.banner {
+  position: sticky; top: 0; z-index: 20;
+  padding: 10px 16px; background: var(--danger); color: #fff; text-align: center; font-weight: 600;
+}
+
+.table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.table-card {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px;
+  min-height: 112px; padding: 12px; text-align: left;
+}
+.table-card.busy { background: var(--busy); border-color: var(--accent); }
+.table-name { font-weight: 700; font-size: 1.1rem; }
+.table-total { font-size: 1.35rem; font-weight: 700; color: var(--accent); }
