@@ -54,6 +54,19 @@ export interface TableSummary {
   itemCount: number;
 }
 
+export interface PayResult {
+  orderId: number;
+  closed: boolean;
+  payment: PaymentRow;
+  table: TableDetail;
+}
+
+export interface PayBody {
+  method: PaymentMethod;
+  amountKurus?: number;
+  itemIds?: number[];
+}
+
 export const ordersApi = {
   tables: () => api<TableSummary[]>('/tables'),
   table: (id: number) => api<TableDetail>(`/tables/${id}`),
@@ -62,5 +75,8 @@ export const ordersApi = {
   setQuantity: (itemId: number, quantity: number) =>
     api<TableDetail>(`/items/${itemId}`, { method: 'PUT', json: { quantity } }),
   voidItem: (itemId: number) => api<TableDetail>(`/items/${itemId}`, { method: 'DELETE' }),
+  pay: (tableId: number, body: PayBody) =>
+    api<PayResult>(`/tables/${tableId}/payments`, { method: 'POST', json: body }),
+  order: (id: number) => api<Order>(`/orders/${id}`),
   catalog: () => api<CatalogCategory[]>('/catalog'),
 };

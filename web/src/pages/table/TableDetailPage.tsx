@@ -7,6 +7,7 @@ import { formatKurus } from '../../lib/format';
 import { useOnline } from '../../realtime/RealtimeProvider';
 import { GramKeypad } from './GramKeypad';
 import { OrderPanel } from './OrderPanel';
+import { PaymentDialog } from './PaymentDialog';
 import { ProductPicker } from './ProductPicker';
 
 type GramTarget = { product: Product } | { item: OrderItem };
@@ -23,6 +24,7 @@ export function TableDetailPage() {
   const [gram, setGram] = useState<GramTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'order' | 'products'>('products');
+  const [paying, setPaying] = useState(false);
 
   // Her işlem güncel masayı döndürür; bu cihaz beklemeden güncellenir, diğerleri SignalR ile.
   const change = useMutation({
@@ -58,6 +60,8 @@ export function TableDetailPage() {
 
   const t = table.data;
   const disabled = !online;
+  const canPay = !!t.order && t.order.remainingKurus > 0;
+  const startPay = () => { setError(null); setPaying(true); };
   const pick = (p: Product) => {
     if (p.unitType === 'Gram') setGram({ product: p });
     else change.mutate(() => ordersApi.addItem(tableId, p.id, 1));
@@ -69,8 +73,11 @@ export function TableDetailPage() {
         <Link to="/" className="back">← Masalar</Link>
         <h1>{t.name}</h1>
         {t.order && <span className="detail-total">{formatKurus(t.order.remainingKurus)}</span>}
+        {canPay && (
+          <button className="primary pay-compact" disabled={disabled || change.isPending} onClick={startPay}>Ödeme al</button>
+        )}
       </div>
-      {error && !gram && <p className="error" role="alert">{error}</p>}
+      {error && !gram && !paying && <p className="error" role="alert">{error}</p>}
       <div className="mobile-tabs">
         <button className={tab === 'order' ? 'active' : ''} onClick={() => setTab('order')}>Hesap ({t.order?.items.length ?? 0})</button>
         <button className={tab === 'products' ? 'active' : ''} onClick={() => setTab('products')}>Ürünler</button>
@@ -83,12 +90,30 @@ export function TableDetailPage() {
             onSetQuantity={(i, q) => change.mutate(() => ordersApi.setQuantity(i.id, q))}
             onVoid={(i) => change.mutate(() => ordersApi.voidItem(i.id))}
             onEditGram={(i) => { setError(null); setGram({ item: i }); }}
+            footer={
+              canPay ? (
+                <button className="primary wide pay-full" disabled={disabled || change.isPending} onClick={startPay}>
+                  Ödeme al · {formatKurus(t.order!.remainingKurus)}
+                </button>
+              ) : null
+            }
           />
         </section>
         <section className="pane-products">
           <ProductPicker disabled={disabled} onPick={(p) => { setError(null); pick(p); }} />
         </section>
       </div>
+      {paying && (
+        <PaymentDialog
+          table={t}
+          disabled={disabled || change.isPending}
+          onPaid={(r) => {
+            qc.setQueryData(['table', tableId], r.table);
+            qc.invalidateQueries({ queryKey: ['tables'] });
+          }}
+          onClose={() => setPaying(false)}
+        />
+      )}
       {gram && (
         <GramKeypad
           title={'product' in gram ? gram.product.name : gram.item.productName}

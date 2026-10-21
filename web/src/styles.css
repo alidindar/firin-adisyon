@@ -187,5 +187,24 @@ button.wide { width: 100%; margin-top: 12px; }
   .pane-order { position: static; max-height: none; }
   .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .mobile-tabs button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .detail-head .pay-compact { display: inline-flex; }
   .detail-panes.show-order .pane-products, .detail-panes.show-products .pane-order { display: none; }
 }
+
+.detail-head .pay-compact { display: none; align-items: center; min-height: 48px; }
+.pay-due { font-size: 1.1rem; margin: 12px 0; }
+.pay-due strong { font-size: 1.35rem; color: var(--accent); }
+.pay-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.pay-buttons button { min-height: 56px; }
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper strong { min-width: 32px; text-align: center; font-size: 1.25rem; }
+.shares { margin: 8px 0; padding-left: 24px; }
+.shares li.next { font-weight: 700; color: var(--accent); }
+.pick-items { list-style: none; margin: 0; padding: 0; max-height: 40dvh; overflow: auto; }
+.pick-items label { display: flex; align-items: center; gap: 8px; min-height: 48px; border-bottom: 1px solid var(--border); }
+.pick-name { flex: 1; min-width: 0; }
+.change { font-size: 1.2rem; }
+.change strong { color: var(--ok); font-size: 1.5rem; }
+.closed-summary { display: flex; flex-direction: column; align-items: stretch; gap: 8px; text-align: center; }
+.closed-summary .payments { list-style: none; padding: 0; margin: 0; color: var(--muted); }
+.ok-big { font-size: 1.5rem; font-weight: 700; color: var(--ok); margin: 0; }
