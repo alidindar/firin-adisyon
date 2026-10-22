@@ -15,7 +15,7 @@ Kullanıcının verdiği kararlar:
 
 ## Mimari
 ```
-Kasa PC (Windows Service, port 5080, 0.0.0.0)
+Kasa PC (Windows Service, port 5080, tüm adresler: IPv4 + IPv6)
  └─ Firin.Api  (ASP.NET Core 10 Minimal API)
      ├─ EF Core + SQLite      → data\firin.db
      ├─ SignalR /hubs/adisyon → masa değişince tüm cihazlara haber verir

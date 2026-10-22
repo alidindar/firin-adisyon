@@ -3,7 +3,7 @@
     "Firin.Api": {
       "commandName": "Project",
       "launchBrowser": false,
-      "applicationUrl": "http://0.0.0.0:5080",
+      "applicationUrl": "http://*:5080",
       "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development", "Firin__DataDir": "../../data" }
     }
   }
