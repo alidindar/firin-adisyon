@@ -53,7 +53,10 @@ function ShellLayout({ me }: { me: Me }) {
           </nav>
           <div className="shell-user">
             <span>{me.name}</span>
-            <button onClick={logout}>Kullanıcı değiştir</button>
+            <button onClick={logout} aria-label="Kullanıcı değiştir">
+              <span className="lbl-long">Kullanıcı değiştir</span>
+              <span className="lbl-short" aria-hidden="true">Çıkış</span>
+            </button>
           </div>
         </header>
         {connection === 'reconnecting' && (
