@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { formatKurus, formatPrice } from '../../lib/format';
-import { pressKey } from '../../lib/keypad';
+import { pressKey, shouldSubmitOnEnter } from '../../lib/keypad';
 import { lineTotal } from '../../lib/pricing';
 
 interface Props {
@@ -25,6 +25,7 @@ export function GramKeypad({ title, pricePerKg, initial, busy, error, onSubmit: 
 
   // Aynı anda gelen iki Enter/tıklama tek kalem eklesin: istek bitene (busy true→false) dek kilit.
   const sent = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!busy) sent.current = false;
   }, [busy]);
@@ -39,8 +40,12 @@ export function GramKeypad({ title, pricePerKg, initial, busy, error, onSubmit: 
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (/^\d$/.test(e.key)) setValue((v) => pressKey(v, e.key));
       else if (e.key === 'Backspace') setValue((v) => pressKey(v, 'back'));
-      // Odaktaki düğmede Enter zaten tıklama üretir; çift ekleme olmasın.
-      else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && valid && !busy) onSubmit(grams);
+      // Tuş takımının kendi odaktaki düğmesinde Enter zaten tıklama üretir; çift ekleme olmasın.
+      // Arkadaki ürün kartı odaktaysa Enter yine ekler (kartın yerel tıklaması engellenir).
+      else if (e.key === 'Enter' && valid && !busy && shouldSubmitOnEnter(e.target as Element, rootRef.current?.closest('[role="dialog"]') ?? null)) {
+        e.preventDefault();
+        onSubmit(grams);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -48,7 +53,7 @@ export function GramKeypad({ title, pricePerKg, initial, busy, error, onSubmit: 
 
   return (
     <Modal title={title} onClose={onClose}>
-      <div className="gram-display">
+      <div ref={rootRef} className="gram-display">
         <span className="gram-value">{value || '0'} g</span>
         <span className="muted">{formatPrice('Gram', pricePerKg)}</span>
         <strong className="gram-total">{formatKurus(lineTotal('Gram', pricePerKg, grams))}</strong>
