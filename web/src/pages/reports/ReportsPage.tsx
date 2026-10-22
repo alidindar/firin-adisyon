@@ -46,7 +46,7 @@ export function ReportsPage() {
 
   return (
     <div className="page reports">
-      <h1>Raporlar</h1>
+      <h1 className="large-title">Raporlar</h1>
       <div className="filters">
         <div className="chips">
           {presets.map(([p, label]) => (

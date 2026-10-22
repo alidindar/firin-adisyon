@@ -8,7 +8,8 @@ import { UsersAdmin } from './UsersAdmin';
 export function AdminPage() {
   return (
     <div className="page">
-      <nav className="tabs">
+      <h1 className="large-title">Yönetim</h1>
+      <nav className="tabs" aria-label="Yönetim bölümleri">
         <NavLink to="/yonetim/urunler">Ürünler</NavLink>
         <NavLink to="/yonetim/kategoriler">Kategoriler</NavLink>
         <NavLink to="/yonetim/masalar">Masalar</NavLink>

@@ -24,6 +24,9 @@ public static class OrderEndpoints
         api.MapDelete("/items/{id:int}", (int id, OrderService s, ClaimsPrincipal u) =>
             s.VoidItemAsync(id, u.UserId())).RequireAuthorization();
 
+        api.MapPost("/items/{id:int}/restore", (int id, OrderService s, ClaimsPrincipal u) =>
+            s.RestoreItemAsync(id, u.UserId())).RequireAuthorization();
+
         api.MapPost("/tables/{id:int}/payments", (int id, PayRequest r, PaymentService s, ClaimsPrincipal u) =>
             s.PayAsync(id, r, u.UserId())).RequireAuthorization();
 

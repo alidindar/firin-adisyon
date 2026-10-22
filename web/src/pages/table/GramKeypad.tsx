@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
-import { formatKurus, formatPrice } from '../../lib/format';
+import { formatKurus, formatPrice, formatQuantity } from '../../lib/format';
 import { pressKey, shouldSubmitOnEnter } from '../../lib/keypad';
 import { lineTotal } from '../../lib/pricing';
 
@@ -53,27 +53,31 @@ export function GramKeypad({ title, pricePerKg, initial, busy, error, onSubmit: 
 
   return (
     <Modal title={title} onClose={onClose}>
-      <div ref={rootRef} className="gram-display">
-        <span className="gram-value">{value || '0'} g</span>
-        <span className="muted">{formatPrice('Gram', pricePerKg)}</span>
-        <strong className="gram-total">{formatKurus(lineTotal('Gram', pricePerKg, grams))}</strong>
+      <div ref={rootRef} className="readout">
+        <div className="big">{grams.toLocaleString('tr-TR')}<span className="u">g</span></div>
+        <div className="sub">{formatPrice('Gram', pricePerKg)}</div>
+        <div className="line">{formatKurus(lineTotal('Gram', pricePerKg, grams))}</div>
       </div>
       <div className="quick">
         {quick.map((g) => (
-          <button key={g} type="button" onClick={() => setValue(String(g))}>{g === 1000 ? '1 kg' : `${g} g`}</button>
+          <button key={g} type="button" className={grams === g ? 'on' : undefined} onClick={() => setValue(String(g))}>
+            {formatQuantity('Gram', g)}
+          </button>
         ))}
       </div>
-      <div className="pinpad">
+      <div className="keypad">
         {digits.map((k) => (
-          <button key={k} type="button" onClick={() => setValue((v) => pressKey(v, k))}>{k}</button>
+          <button key={k} type="button" className="key" onClick={() => setValue((v) => pressKey(v, k))}>{k}</button>
         ))}
-        <button type="button" onClick={() => setValue('')}>C</button>
-        <button type="button" onClick={() => setValue((v) => pressKey(v, '0'))}>0</button>
-        <button type="button" onClick={() => setValue((v) => pressKey(v, 'back'))} aria-label="Sil">⌫</button>
+        <button type="button" className="key fn" onClick={() => setValue('')}>Temizle</button>
+        <button type="button" className="key" onClick={() => setValue((v) => pressKey(v, '0'))}>0</button>
+        <button type="button" className="key fn" onClick={() => setValue((v) => pressKey(v, 'back'))} aria-label="Son rakamı sil">
+          <svg viewBox="0 0 26 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d="M8 2h15a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 23 18H8l-6.5-8z" /><path d="m12 7 6 6M18 7l-6 6" /></svg>
+        </button>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <button className="primary wide" disabled={!valid || busy} onClick={() => onSubmit(grams)}>
-        {initial ? 'Güncelle' : 'Ekle'}
+        {!valid ? 'Gram girin' : `${initial ? 'Güncelle' : 'Ekle'} · ${formatQuantity('Gram', grams)}`}
       </button>
     </Modal>
   );

@@ -45,7 +45,8 @@ export function PinPad({ onComplete, disabled, error }: Props) {
 
   return (
     <div className="pin">
-      <div className="pin-dots" aria-label={`${length} hane girildi`}>
+      {/* Hata gelince noktalar sallanır; key değişince hareket yeniden başlar. */}
+      <div key={error ?? ''} className={`pin-dots${error ? ' shake' : ''}`} aria-label={`${length} hane girildi`}>
         {[0, 1, 2, 3].map((i) => (
           <span key={i} className={i < length ? 'filled' : ''} />
         ))}
@@ -57,11 +58,11 @@ export function PinPad({ onComplete, disabled, error }: Props) {
             {k}
           </button>
         ))}
-        <button type="button" onClick={back} disabled={disabled} aria-label="Sil">
-          ⌫
-        </button>
-        <button type="button" onClick={() => press('0')} disabled={disabled}>
+        <button type="button" className="zero" onClick={() => press('0')} disabled={disabled}>
           0
+        </button>
+        <button type="button" className="fn" onClick={back} disabled={disabled}>
+          Sil
         </button>
       </div>
     </div>

@@ -175,6 +175,47 @@ public sealed class OrderService(AppDb db, TimeProvider clock, IRealtime realtim
         return order.TableId;
     }
 
+    /// <summary>İptali geri alma süresi; arayüzdeki "Geri al" bildirimi bundan kısa görünür.</summary>
+    public static readonly TimeSpan RestoreWindow = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Yanlışlıkla yapılan iptali geri alır: yalnızca iptal eden kişi, <see cref="RestoreWindow"/> içinde.
+    /// İptal adisyonu kapattıysa (son kalem ya da kalan sıfır) ve masada yeni adisyon açılmadıysa adisyon yeniden açılır.
+    /// OrderLock'u kendisi alır; kilit tutulurken çağrılmamalı (kilit yeniden girişli değil).
+    /// </summary>
+    public async Task<TableDetailDto> RestoreItemAsync(int itemId, int userId)
+    {
+        int tableId;
+        using (await orderLock.AcquireAsync())
+            tableId = await RestoreItemCoreAsync(itemId, userId);
+        await NotifyTableChangedAsync(tableId);
+        return await GetTableAsync(tableId);
+    }
+
+    private async Task<int> RestoreItemCoreAsync(int itemId, int userId)
+    {
+        var orderId = await db.OrderItems.Where(i => i.Id == itemId).Select(i => (int?)i.OrderId).FirstOrDefaultAsync()
+            ?? throw new DomainException("kalem_yok", "Kalem bulunamadı.", StatusCodes.Status404NotFound);
+        var order = await db.Orders.Include(o => o.Items).Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+        var item = order.Items.Single(i => i.Id == itemId);
+        var cannot = new DomainException("geri_alinamaz", "Bu iptal artık geri alınamaz.", StatusCodes.Status409Conflict);
+        if (item.VoidedAt is null || item.VoidedById != userId || Now - item.VoidedAt > RestoreWindow) throw cannot;
+
+        if (order.Status != OrderStatus.Open)
+        {
+            // Yalnızca bu iptalin kapattığı adisyon açılır; ödemeyle kapanmış ya da başka işlemle kapanmış olan değil.
+            if (order.ClosedById != userId || order.ClosedAt is null || order.ClosedAt < item.VoidedAt) throw cannot;
+            if (await db.Orders.AnyAsync(o => o.TableId == order.TableId && o.Status == OrderStatus.Open)) throw cannot;
+            order.Status = OrderStatus.Open;
+            order.ClosedAt = null;
+            order.ClosedById = null;
+        }
+        item.VoidedAt = null;
+        item.VoidedById = null;
+        await db.SaveChangesAsync();
+        return order.TableId;
+    }
+
     /// <summary>
     /// Aktif kalem varsa ve kalan sıfırsa adisyonu kapatır. Kaydetmez. Çağıran <see cref="OrderLock"/>'u tutmalı.
     /// Kilit yeniden girişli değildir: kilit tutulurken AddItemAsync, SetQuantityAsync veya VoidItemAsync

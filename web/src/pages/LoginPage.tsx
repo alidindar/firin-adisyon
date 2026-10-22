@@ -35,6 +35,7 @@ function UserLogin({ title, users }: { title: string; users: UserOption[] }) {
           <div className="user-grid">
             {users.map((u) => (
               <button key={u.id} className="user-btn" onClick={() => { setSelected(u); setError(null); }}>
+                <span className="avatar" aria-hidden="true">{u.name.charAt(0).toLocaleUpperCase('tr-TR')}</span>
                 {u.name}
               </button>
             ))}

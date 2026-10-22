@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { ordersApi, type PayBody, type PayResult, type TableDetail } from '../../api/orders';
 import { Modal } from '../../components/Modal';
+import { Segmented } from '../../components/Segmented';
 import { formatKurus, formatQuantity, parseTlToKurus } from '../../lib/format';
 import { cashSuggestions, changeDue, remainingShares } from '../../lib/split';
 
@@ -17,7 +18,7 @@ interface Props {
   onClose: () => void;
 }
 
-const modes: [Mode, string][] = [
+const modes: readonly (readonly [Mode, string])[] = [
   ['full', 'Tamamı'],
   ['amount', 'Tutar gir'],
   ['split', 'Kişi başı'],
@@ -94,33 +95,46 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
 
   if (mode === 'full') {
     target = { amountKurus: remaining, expectedRemainingKurus: remaining };
-    body = <p className="pay-due">Kalan hesap: <strong>{formatKurus(remaining)}</strong></p>;
+    body = <p className="pay-remain"><span className="k">Kalan hesap</span><span className="v">{formatKurus(remaining)}</span></p>;
   } else if (mode === 'amount') {
     const k = parseTlToKurus(amountText);
     if (k !== null && k > 0 && k <= remaining) target = { amountKurus: k, expectedRemainingKurus: remaining };
     body = (
-      <label className="form">
-        Alınacak tutar (₺) — kalan {formatKurus(remaining)}
-        <input inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} autoFocus placeholder="50,00" />
-        {k !== null && k > remaining && <span className="error">Tutar kalan hesaptan fazla.</span>}
-      </label>
+      <div>
+        <label className="panel amount-in">
+          <span aria-hidden="true">₺</span>
+          <input inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} autoFocus placeholder="0,00" aria-label="Alınacak tutar (₺)" />
+        </label>
+        {k !== null && k > remaining
+          ? <p className="field-hint error">Tutar kalan hesaptan fazla.</p>
+          : <p className="field-hint">Kalan {formatKurus(remaining)}</p>}
+      </div>
     );
   } else if (mode === 'split') {
     const shares = remainingShares(remaining, people, paidShares);
     const left = shares.length;
     target = shares.length ? { amountKurus: shares[0], expectedRemainingKurus: remaining } : null;
     body = (
-      <div className="split">
-        <div className="stepper">
-          <span>Kişi sayısı</span>
-          <button aria-label="Azalt" disabled={people <= Math.max(2, paidShares + 1)} onClick={() => setPeople((p) => p - 1)}>−</button>
-          <strong>{people}</strong>
-          <button aria-label="Artır" disabled={people >= 50} onClick={() => setPeople((p) => p + 1)}>+</button>
+      <div className="panel split">
+        <div className="panel-row">
+          <span className="k">Kişi sayısı</span>
+          <span className="stepper-wide">
+            <button type="button" aria-label="Azalt" disabled={people <= Math.max(2, paidShares + 1)} onClick={() => setPeople((p) => p - 1)}>−</button>
+            <strong>{people}</strong>
+            <button type="button" aria-label="Artır" disabled={people >= 50} onClick={() => setPeople((p) => p + 1)}>+</button>
+          </span>
         </div>
-        <p className="muted">{paidShares} kişi ödedi, {left} kişi kaldı.</p>
-        <ol className="shares">
-          {shares.map((s, i) => <li key={i} className={i === 0 ? 'next' : ''}>{formatKurus(s)}</li>)}
-        </ol>
+        <div className="panel-row">
+          <span className="k">{paidShares} kişi ödedi, {left} kişi kaldı</span>
+          <span className="v">{shares.length ? formatKurus(shares[0]) : '—'}</span>
+        </div>
+        {shares.length > 1 && (
+          <div className="panel-row">
+            <ol className="shares" aria-label="Kalan paylar">
+              {shares.map((s, i) => <li key={i} className={i === 0 ? 'next' : ''}>{formatKurus(s)}</li>)}
+            </ol>
+          </div>
+        )}
       </div>
     );
   } else {
@@ -133,7 +147,7 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
         <ul className="pick-items">
           {unpaid.map((i) => (
             <li key={i.id}>
-              <label className="check">
+              <label>
                 <input type="checkbox" checked={selected.includes(i.id)}
                   onChange={(e) => setSelected((s) => (e.target.checked ? [...s, i.id] : s.filter((x) => x !== i.id)))} />
                 <span className="pick-name">{i.productName} · {formatQuantity(i.unitType, i.quantity)}</span>
@@ -142,28 +156,24 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
             </li>
           ))}
         </ul>
-        <p className="pay-due">Seçilen: <strong>{formatKurus(sum)}</strong></p>
+        <p className="pay-remain"><span className="k">Seçilen</span><span className="v">{formatKurus(sum)}</span></p>
       </>
     );
   }
 
   return (
-    <Modal title={`${table.name} · Ödeme`} onClose={safeClose}>
+    <Modal title={`${table.name} · Ödeme`} onClose={safeClose} onBack={cashFor && !busy ? () => { setCashFor(null); setError(null); } : undefined}>
       {cashFor ? (
-        <CashStep target={cashFor} busy={busy} onBack={() => { setCashFor(null); setError(null); }} onConfirm={(change) => send('Cash', cashFor, change)} />
+        <CashStep target={cashFor} busy={busy} onConfirm={(change) => send('Cash', cashFor, change)} />
       ) : (
         <>
-          <div className="chips">
-            {modes.map(([m, label]) => (
-              <button key={m} className={m === mode ? 'chip active' : 'chip'} disabled={busy} onClick={() => { setMode(m); setError(null); }}>{label}</button>
-            ))}
-          </div>
+          <Segmented label="Ödeme şekli" value={mode} options={modes} disabled={busy} onChange={(m) => { setMode(m); setError(null); }} />
           {body}
           <div className="pay-buttons">
             <button className="primary" disabled={!target || busy} onClick={() => { setError(null); setCashFor(target); }}>
               Nakit{target ? ` · ${formatKurus(target.amountKurus)}` : ''}
             </button>
-            <button className="primary" disabled={!target || busy} onClick={() => target && send('Card', target)}>
+            <button className="tinted" disabled={!target || busy} onClick={() => target && send('Card', target)}>
               Kart{target ? ` · ${formatKurus(target.amountKurus)}` : ''}
             </button>
           </div>
@@ -174,10 +184,9 @@ export function PaymentDialog({ table, disabled, onPaid, onClose }: Props) {
   );
 }
 
-function CashStep({ target, busy, onBack, onConfirm }: {
+function CashStep({ target, busy, onConfirm }: {
   target: Target;
   busy: boolean;
-  onBack: () => void;
   onConfirm: (change: number) => void;
 }) {
   const [givenText, setGivenText] = useState('');
@@ -186,24 +195,23 @@ function CashStep({ target, busy, onBack, onConfirm }: {
   const short = given !== null && given < target.amountKurus;
 
   return (
-    <div className="cash-step">
-      <p className="pay-due">Alınacak nakit: <strong>{formatKurus(target.amountKurus)}</strong></p>
+    <>
+      <p className="pay-remain"><span className="k">Alınacak nakit</span><span className="v">{formatKurus(target.amountKurus)}</span></p>
       <div className="quick">
         {cashSuggestions(target.amountKurus).map((v) => (
-          <button key={v} type="button" onClick={() => setGivenText((v / 100).toFixed(2).replace('.', ','))}>{formatKurus(v)}</button>
+          <button key={v} type="button" className={given === v ? 'on' : undefined} onClick={() => setGivenText((v / 100).toFixed(2).replace('.', ','))}>{formatKurus(v)}</button>
         ))}
       </div>
-      <label className="form">
-        Müşterinin verdiği (isteğe bağlı)
-        <input inputMode="decimal" value={givenText} onChange={(e) => setGivenText(e.target.value)} placeholder="200,00" />
-      </label>
-      {short && <p className="error">Verilen para tutardan az.</p>}
-      {change > 0 && <p className="change">Para üstü: <strong>{formatKurus(change)}</strong></p>}
-      <div className="pay-buttons">
-        <button type="button" onClick={onBack} disabled={busy}>Geri</button>
-        <button type="button" className="primary" disabled={busy || short} onClick={() => onConfirm(change)}>Nakit ödemeyi kaydet</button>
+      <div>
+        <label className="panel amount-in">
+          <span aria-hidden="true">₺</span>
+          <input inputMode="decimal" value={givenText} onChange={(e) => setGivenText(e.target.value)} placeholder="Müşterinin verdiği" aria-label="Müşterinin verdiği (isteğe bağlı)" />
+        </label>
+        {short ? <p className="field-hint error">Verilen para tutardan az.</p> : <p className="field-hint">İsteğe bağlı; para üstünü hesaplar.</p>}
       </div>
-    </div>
+      {change > 0 && <p className="change-big"><span className="k">Para üstü</span><span className="v">{formatKurus(change)}</span></p>}
+      <button type="button" className="primary wide" disabled={busy || short} onClick={() => onConfirm(change)}>Nakit ödemeyi kaydet</button>
+    </>
   );
 }
 
@@ -213,10 +221,11 @@ function ClosedSummary({ orderId, change, onClose }: { orderId: number; change: 
   return (
     <Modal title="Hesap kapandı" onClose={onClose}>
       <div className="closed-summary">
-        <p className="ok-big">✓ Hesap kapandı</p>
+        <svg className="done-mark" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="38" /><path d="M23 39l10 10 20-22" fill="none" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <h3>Hesap kapandı</h3>
         {order.data && (
           <>
-            <p>Toplam: <strong>{formatKurus(order.data.totalKurus)}</strong></p>
+            <p>Toplam <strong>{formatKurus(order.data.totalKurus)}</strong></p>
             <ul className="payments">
               {order.data.payments.map((p) => (
                 <li key={p.id}>{p.method === 'Cash' ? 'Nakit' : 'Kart'} · {formatKurus(p.amountKurus)}</li>
@@ -224,7 +233,7 @@ function ClosedSummary({ orderId, change, onClose }: { orderId: number; change: 
             </ul>
           </>
         )}
-        {change > 0 && <p className="change">Para üstü: <strong>{formatKurus(change)}</strong></p>}
+        {change > 0 && <p className="change-big"><span className="k">Para üstü</span><span className="v">{formatKurus(change)}</span></p>}
         <button className="primary wide" onClick={() => navigate('/')}>Masalara dön</button>
         <button className="wide" onClick={onClose}>Bu masada kal</button>
       </div>

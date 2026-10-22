@@ -77,6 +77,8 @@ export const ordersApi = {
   setQuantity: (itemId: number, quantity: number) =>
     api<TableDetail>(`/items/${itemId}`, { method: 'PUT', json: { quantity } }),
   voidItem: (itemId: number) => api<TableDetail>(`/items/${itemId}`, { method: 'DELETE' }),
+  /** İptal eden kişi, kısa süre içinde. */
+  restoreItem: (itemId: number) => api<TableDetail>(`/items/${itemId}/restore`, { method: 'POST' }),
   pay: (tableId: number, body: PayBody) =>
     api<PayResult>(`/tables/${tableId}/payments`, { method: 'POST', json: body }),
   order: (id: number) => api<Order>(`/orders/${id}`),

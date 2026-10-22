@@ -191,6 +191,60 @@ public sealed class OrderTests : IDisposable
         Assert.Equal("kalem_iptal", await (await _staff.DeleteAsync($"/api/items/{item.Id}")).ProblemCode());
     }
 
+    private Task<HttpResponseMessage> Restore(int itemId, HttpClient? as_ = null) =>
+        (as_ ?? _staff).PostAsync($"/api/items/{itemId}/restore", null);
+
+    [Fact]
+    public async Task Void_can_be_undone_shortly_after()
+    {
+        await SetupAsync();
+        await AddOk(_tea.Id, 2);
+        var item = (await AddOk(_cookie.Id, 250)).Order!.Items[1];
+        await _staff.DeleteAsync($"/api/items/{item.Id}");
+        _app.Clock.Advance(TimeSpan.FromSeconds(30));
+
+        var res = await Restore(item.Id);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var d = await res.ReadAs<TableDetailDto>();
+        Assert.Equal(2, d.Order!.Items.Count);
+        Assert.Equal(3000 + 15000, d.Order.TotalKurus);
+        Assert.Null(_app.Db(db => db.OrderItems.Single(i => i.Id == item.Id).VoidedAt));
+    }
+
+    [Fact]
+    public async Task Undoing_last_item_void_reopens_cancelled_order()
+    {
+        await SetupAsync();
+        var item = Assert.Single((await AddOk(_tea.Id, 1)).Order!.Items);
+        await _staff.DeleteAsync($"/api/items/{item.Id}");
+
+        var d = await (await Restore(item.Id)).ReadAs<TableDetailDto>();
+        Assert.Equal(item.Id, Assert.Single(d.Order!.Items).Id);
+        var o = _app.Db(db => db.Orders.Single());
+        Assert.Equal(OrderStatus.Open, o.Status);
+        Assert.Null(o.ClosedAt);
+        Assert.Null(o.ClosedById);
+    }
+
+    [Fact]
+    public async Task Void_cannot_be_undone_late_by_others_or_after_new_order()
+    {
+        await SetupAsync();
+        var first = Assert.Single((await AddOk(_tea.Id, 1)).Order!.Items);
+        await _staff.DeleteAsync($"/api/items/{first.Id}");
+        Assert.Equal("geri_alinamaz", await (await Restore(first.Id, _owner)).ProblemCode());
+
+        // Masada yeni adisyon açıldı: iptal edilen eski adisyon geri açılamaz.
+        await AddOk(_tea.Id, 1);
+        Assert.Equal("geri_alinamaz", await (await Restore(first.Id)).ProblemCode());
+
+        var second = (await AddOk(_cookie.Id, 100)).Order!.Items.Single(i => i.ProductId == _cookie.Id);
+        Assert.Equal("geri_alinamaz", await (await Restore(second.Id)).ProblemCode()); // iptal edilmemiş
+        await _staff.DeleteAsync($"/api/items/{second.Id}");
+        _app.Clock.Advance(TimeSpan.FromSeconds(61));
+        Assert.Equal("geri_alinamaz", await (await Restore(second.Id)).ProblemCode());
+    }
+
     [Fact]
     public async Task Paid_item_cannot_be_changed_or_voided()
     {
