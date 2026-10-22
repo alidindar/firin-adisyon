@@ -2,13 +2,14 @@
 
 ## 1. Kasa bilgisayarına kurulum
 
-1. Proje klasöründe PowerShell açıp yayını üretin:
+1. Yayını üretin. Bu adım için bilgisayarda **.NET 10 SDK** ve **Node 24** kurulu olmalıdır. Kasa PC'de yoksa yayını geliştirme bilgisayarında üretip proje klasörünü `publish\FirinAdisyon` ile birlikte kasa PC'ye kopyalayın. Proje klasöründe PowerShell açın:
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\publish.ps1
    ```
    Betik web arayüzünü derler, testleri çalıştırır ve .NET kurulumu gerektirmeyen bir yayın hazırlar (`publish\FirinAdisyon`).
-2. PowerShell'i **Yönetici olarak** açıp servisi kurun:
+2. PowerShell'i **Yönetici olarak** açıp servisi kurun. Yönetici PowerShell `C:\Windows\System32` içinde açılır; önce proje klasörüne geçin:
    ```powershell
+   cd "<proje klasörü>"
    powershell -ExecutionPolicy Bypass -File scripts\install-service.ps1
    ```
    Betik şunları yapar:
@@ -20,7 +21,7 @@
 
 ### Güncelleme
 
-Aynı iki komutu yeniden çalıştırın. Veriler korunur. Betik güncellemeden önce veritabanının bir kopyasını `C:\FirinAdisyon\data\backups` klasörüne alır (`firin-…db`, Ayarlar'daki yedek listesinde görünür).
+Aynı iki komutu yeniden çalıştırın. Veriler korunur. Betik güncellemeden önce veritabanının bir kopyasını `C:\FirinAdisyon\data\backups` klasörüne alır (`firin-…db`) ve tam yolunu ekrana yazar. Ayarlar'da **başka bir yedek klasörü** (örn. USB) seçiliyse bu kopya yedek listesinde görünmez ve otomatik silinmez; gerekirse elle silin. Servis düzgün kapanmadıysa kopyanın yanında bir `-wal` dosyası da olur (bkz. Yedekten geri dönme). Yayın klasöründe (`publish\FirinAdisyon`) `data` klasörü varsa betik, verilerin üzerine yazılmasın diye durur; o klasörü silin.
 
 ### Klasörler
 
@@ -78,7 +79,7 @@ Yedek dosyaları yalnızca veritabanını (ürünler, adisyonlar, ödemeler, kul
 
 1. PowerShell'i Yönetici olarak açın: `Stop-Service FirinAdisyon`
 2. `C:\FirinAdisyon\data\firin.db` dosyasının yanındaki varsa `firin.db-wal` ve `firin.db-shm` dosyalarını silin.
-3. Geri dönmek istediğiniz yedeği (örn. `firin-20261021-060000.db`) `C:\FirinAdisyon\data\firin.db` adıyla kopyalayın. Mevcut dosyanın üzerine yazın.
+3. Geri dönmek istediğiniz yedeği (örn. `firin-20261021-060000.db`) `C:\FirinAdisyon\data\firin.db` adıyla kopyalayın. Mevcut dosyanın üzerine yazın. Yedeğin yanında aynı adlı bir `-wal` dosyası varsa (örn. `firin-20261021-060000.db-wal`; güncelleme öncesi kopyalarda olabilir) onu da `firin.db-wal` adıyla yanına kopyalayın; yoksa son kayıtlar kaybolur.
 4. `Start-Service FirinAdisyon`
 
 Yedek dosya adındaki saat UTC'dir (Türkiye saatinden 3 saat geri). Ayarlar sayfası yedekleri Türkiye saatiyle listeler.
@@ -120,7 +121,7 @@ Kurulumdan sonra kasa PC'de, bir tablette ve bir telefonda sırayla deneyin. Mas
 10. Telefonda bir rapor sütununa dokunun: ipucu satırı güncellenir, renk takılı kalmaz. "Tablo olarak göster" yatay kaydırma olmadan açılır.
 
 **Yönetim dokunma kontrolü (sahip hesabıyla, gerçek tablette)**
-1. Yönetim bağlantısına dokunun; sekmeleri (Kategoriler, Ürünler, Masalar, Kullanıcılar, Ayarlar) sırayla gezin.
+1. Yönetim bağlantısına dokunun; sekmeleri (Ürünler, Kategoriler, Masalar, Kullanıcılar, Ayarlar) sırayla gezin.
 2. Yeni ürün ekleyin: formu doldurun, kamerayla fotoğraf çekin ya da galeriden yükleyin, kaydedin. Ürünü pasif / aktif yapın.
 3. Masa ekleyin. Açılan pencereleri hem düğmesiyle hem pencere dışına dokunarak kapatın.
 4. Ayarlar'da QR kodunu ve yedek indirmeyi deneyin.

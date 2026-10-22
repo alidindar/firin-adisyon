@@ -10,9 +10,16 @@ if (-not (Test-Path (Join-Path $source 'Firin.Api.exe'))) { throw 'Önce scripts
 $svc = Get-Service FirinAdisyon -ErrorAction SilentlyContinue
 if ($svc -and $svc.Status -ne 'Stopped') {
     Stop-Service FirinAdisyon
-    $svc.WaitForStatus('Stopped', '00:00:30')
+    try { $svc.WaitForStatus('Stopped', '00:00:30') }
+    catch { throw "Servis 30 sn içinde kapanmadı; Görev Yöneticisi'nden kapatıp tekrar deneyin." }
 }
-Get-Process Firin.Api -ErrorAction SilentlyContinue | Wait-Process -Timeout 30
+try { Get-Process Firin.Api -ErrorAction SilentlyContinue | Wait-Process -Timeout 30 -ErrorAction Stop }
+catch { throw "Firin.Api.exe 30 sn içinde kapanmadı; Görev Yöneticisi'nden kapatıp tekrar deneyin." }
+
+# Yayın klasöründe data olmamalı (exe elle çalıştırılınca oluşur); kopyalanırsa gerçek verinin üstüne yazar.
+if (Test-Path (Join-Path $source 'data')) {
+    throw "Yayın klasöründe 'data' klasörü var ($source\data). Silin ya da scripts\publish.ps1'i yeniden çalıştırın; sonra tekrar deneyin."
+}
 
 # Güncellemeden önce veritabanının kopyasını al (servis durdu, dosya tutarlı).
 # Ad, uygulamanın yedek adıyla aynıdır; Ayarlar'daki yedek listesinde görünür ve 30 gün sonra silinir.
@@ -26,13 +33,15 @@ if (Test-Path $db) {
     # Servis düzgün kapanmadıysa -wal içinde işlenmemiş kayıtlar olabilir; yanına aynı adla koy.
     if (Test-Path "$db-wal") { Copy-Item "$db-wal" "$copy-wal" }
     Write-Host "Güncelleme öncesi yedek: $copy"
+    if (Test-Path "$copy-wal") { Write-Host "  (işlenmemiş kayıtlar için: $copy-wal; geri dönerken ikisini birlikte kopyalayın)" }
+    Write-Host "  (Ayarlar'daki yedek klasörü başkaysa bu kopya listede görünmez ve otomatik silinmez.)"
 }
 
 New-Item -ItemType Directory -Force $Target | Out-Null
 # /MIR, hedefte yayında olmayan her şeyi siler (data\ hariç: veritabanı, fotoğraflar, yedekler).
 # Bu yüzden C:\FirinAdisyon içine kendi dosyalarınızı (örn. appsettings.Production.json) koymayın.
 # /R:2 /W:2: kilitli dosya yüzünden betik sonsuza dek beklemesin.
-robocopy $source $Target /MIR /XD (Join-Path $Target 'data') /R:2 /W:2 /NFL /NDL /NJH /NJS | Out-Null
+robocopy $source $Target /MIR /XD (Join-Path $source 'data') (Join-Path $Target 'data') /R:2 /W:2 /NFL /NDL /NJH /NJS | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "Dosyalar kopyalanamadı (robocopy kodu $LASTEXITCODE)" }
 
 if (-not $svc) {
@@ -42,8 +51,10 @@ if (-not $svc) {
 }
 # Çökerse 5 sn sonra yeniden başlat. Güncellemelerde de yeniden uygulanır.
 sc.exe failure FirinAdisyon reset= 86400 actions= restart/5000/restart/5000/restart/60000 | Out-Null
+if ($LASTEXITCODE) { throw "sc.exe failure başarısız (kod $LASTEXITCODE)" }
 # Hata koduyla çıkışta (örn. başlangıçta migration hatası) da yeniden başlatma çalışsın.
 sc.exe failureflag FirinAdisyon 1 | Out-Null
+if ($LASTEXITCODE) { throw "sc.exe failureflag başarısız (kod $LASTEXITCODE)" }
 
 if (-not (Get-NetFirewallRule -DisplayName 'Firin Adisyon 5080' -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule -DisplayName 'Firin Adisyon 5080' -Direction Inbound -Protocol TCP -LocalPort 5080 `
