@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketDays, formatDayShort, presetRange, toIsoDate } from './dates';
+import { bucketDays, formatDayShort, presetRange, rangeProblem, toIsoDate } from './dates';
 
 // 22 Ekim 2026 perşembe
 const today = new Date(2026, 9, 22, 15, 30);
@@ -49,13 +49,27 @@ describe('bucketDays', () => {
   it('62 günden uzunu 7 günlük kovalara toplar', () => {
     const out = bucketDays(mk(70));
     expect(out).toHaveLength(10);
-    expect(out[0]).toEqual({ day: '2026-01-01', endDay: '2026-01-07', revenueKurus: 700, cashKurus: 420, cardKurus: 280 });
+    expect(out[0]).toEqual({ day: '2026-01-01', endDay: '2026-01-07', dayCount: 7, revenueKurus: 700, cashKurus: 420, cardKurus: 280 });
   });
 
   it('son kova eksik kalabilir', () => {
     const out = bucketDays(mk(366));
     expect(out).toHaveLength(53);
-    expect(out[52]).toMatchObject({ day: '2026-12-31', endDay: '2027-01-01', revenueKurus: 200 });
+    expect(out[52]).toMatchObject({ day: '2026-12-31', endDay: '2027-01-01', dayCount: 2, revenueKurus: 200 });
     expect(out.reduce((a, b) => a + b.revenueKurus, 0)).toBe(36600);
+  });
+});
+
+describe('rangeProblem', () => {
+  it.each([
+    ['2026-10-01', '2026-10-22', null],
+    ['2025-10-23', '2026-10-22', null], // 365 gün
+    ['2025-10-22', '2026-10-22', null], // tam 366 gün
+    ['2025-10-21', '2026-10-22', 'En fazla 366 gün seçilebilir.'],
+    ['2026-10-23', '2026-10-22', 'Başlangıç bitişten sonra olamaz.'],
+    ['0002-01-01', '2026-10-22', 'Geçerli bir tarih girin.'],
+    ['', '2026-10-22', 'Geçerli bir tarih girin.'],
+  ])('%s .. %s', (from, to, expected) => {
+    expect(rangeProblem(from, to)).toBe(expected);
   });
 });

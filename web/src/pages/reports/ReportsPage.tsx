@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { reportsApi } from '../../api/reports';
-import { formatDateTime, presetRange, type Preset } from '../../lib/dates';
+import { formatDateTime, presetRange, rangeProblem, type Preset } from '../../lib/dates';
 import { formatKurus, formatQuantity } from '../../lib/format';
 import { DailyChart } from './DailyChart';
 import { OrderHistory } from './OrderHistory';
@@ -17,11 +17,14 @@ const presets: [Preset, string][] = [
 export function ReportsPage() {
   const [preset, setPreset] = useState<Preset | 'custom'>('today');
   const [range, setRange] = useState(() => presetRange('today', new Date()));
+  const problem = rangeProblem(range.from, range.to);
   const summary = useQuery({
+    enabled: !problem,
     queryKey: ['reports', 'summary', range.from, range.to],
     queryFn: () => reportsApi.summary(range.from, range.to),
   });
   const orders = useQuery({
+    enabled: !problem,
     queryKey: ['reports', 'orders', range.from, range.to],
     queryFn: () => reportsApi.orders(range.from, range.to),
   });
@@ -51,9 +54,10 @@ export function ReportsPage() {
         <label>Bitiş<input type="date" value={range.to} min={range.from} onChange={(e) => setDate('to', e.target.value)} /></label>
       </div>
 
-      {summary.isPending && <p>Yükleniyor…</p>}
+      {problem && <p className="range-hint error" role="alert">{problem}</p>}
+      {!problem && summary.isPending && <p>Yükleniyor…</p>}
       {summary.isError && <p className="error">{summary.error.message}</p>}
-      {s && (
+      {!problem && s && (
         <>
           <div className="stats">
             <div className="stat hero"><span>Ciro</span><strong>{formatKurus(s.revenueKurus)}</strong></div>
@@ -88,9 +92,9 @@ export function ReportsPage() {
 
       <section>
         <h2>Hesap geçmişi</h2>
-        {orders.isPending && <p>Yükleniyor…</p>}
+        {!problem && orders.isPending && <p>Yükleniyor…</p>}
         {orders.isError && <p className="error">{orders.error.message}</p>}
-        {orders.data && <OrderHistory rows={orders.data} />}
+        {!problem && orders.data && <OrderHistory rows={orders.data} />}
       </section>
     </div>
   );

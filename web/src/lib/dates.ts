@@ -45,23 +45,39 @@ export function formatDateTime(iso: string): string {
 export interface ChartBucket extends DailyRow {
   /** Kovanın son günü; günlük kovada day ile aynıdır. */
   endDay: string;
+  /** Kovadaki gün sayısı; 7 günlük kovada son kova 7'den az olabilir. */
+  dayCount: number;
 }
 
 export const MAX_DAILY_BARS = 62;
 
 /** 62 güne kadar günlük bırakır; daha uzun aralığı 7 günlük kovalara toplar (sütunlar telefonda sığsın diye). */
 export function bucketDays(days: DailyRow[]): ChartBucket[] {
-  if (days.length <= MAX_DAILY_BARS) return days.map((d) => ({ ...d, endDay: d.day }));
+  if (days.length <= MAX_DAILY_BARS) return days.map((d) => ({ ...d, endDay: d.day, dayCount: 1 }));
   const out: ChartBucket[] = [];
   for (let i = 0; i < days.length; i += 7) {
     const chunk = days.slice(i, i + 7);
     out.push({
       day: chunk[0].day,
       endDay: chunk[chunk.length - 1].day,
+      dayCount: chunk.length,
       revenueKurus: chunk.reduce((a, d) => a + d.revenueKurus, 0),
       cashKurus: chunk.reduce((a, d) => a + d.cashKurus, 0),
       cardKurus: chunk.reduce((a, d) => a + d.cardKurus, 0),
     });
   }
   return out;
+}
+
+export const MAX_RANGE_DAYS = 366;
+const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Özel aralık sorgulanabilir mi? Uygun değilse kullanıcıya gösterilecek kısa mesajı döner, uygunsa null. */
+export function rangeProblem(from: string, to: string): string | null {
+  if (!isoRe.test(from) || !isoRe.test(to) || from < '2000-01-01' || to < '2000-01-01') return 'Geçerli bir tarih girin.';
+  if (from > to) return 'Başlangıç bitişten sonra olamaz.';
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  const span = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000) + 1;
+  return span > MAX_RANGE_DAYS ? `En fazla ${MAX_RANGE_DAYS} gün seçilebilir.` : null;
 }

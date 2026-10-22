@@ -217,6 +217,7 @@ button.wide { width: 100%; margin-top: 12px; }
 .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 .filters input[type='date'] { width: auto; }
 
+.range-hint { margin: 0 0 12px; }
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .stat { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
 .stat span { color: var(--muted); font-size: 0.9rem; }
@@ -230,13 +231,13 @@ button.wide { width: 100%; margin-top: 12px; }
 .chart-title { font-weight: 600; margin-bottom: 4px; }
 .chart-tip { margin: 0 0 8px; min-height: 1.4em; color: var(--muted); font-size: 0.9rem; }
 
-/* Sütunlar: ≤24 px, uç 4 px yuvarlak, taban düz, aralarında 2 px boşluk. Üstteki 20 px en yüksek sütunun etiketine ayrılır. */
-.columns { display: flex; align-items: stretch; gap: 2px; height: 200px; padding-top: 20px; box-sizing: border-box; border-bottom: 1px solid var(--border); }
+/* Sütunlar: ≤24 px, uç 4 px yuvarlak, taban düz. Yuva 26 px'e kadar, çubuk yuvadan 2 px dar: görünen boşluk her genişlikte 2 px. Üstteki 20 px en yüksek sütunun etiketine ayrılır. */
+.columns { display: flex; align-items: stretch; justify-content: center; gap: 0; height: 200px; padding-top: 20px; box-sizing: border-box; border-bottom: 1px solid var(--border); }
 .col-slot {
-  flex: 1; min-width: 0; min-height: 0; height: 100%; padding: 0; border: none; border-radius: 0; background: none;
+  flex: 1 1 0; max-width: 26px; min-width: 0; min-height: 0; height: 100%; padding: 0; border: none; border-radius: 0; background: none;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative;
 }
-.col-bar { flex-shrink: 0; width: min(24px, 80%); background: var(--accent); border-radius: 4px 4px 0 0; }
+.col-bar { flex-shrink: 0; width: min(24px, calc(100% - 2px)); background: var(--accent); border-radius: 4px 4px 0 0; }
 .col-slot.active .col-bar { filter: brightness(0.85); }
 @media (hover: hover) and (pointer: fine) {
   .col-slot:hover .col-bar { filter: brightness(0.85); }

@@ -20,6 +20,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let stopped = false;
     let retryTimer: number | undefined;
+    let reportsTimer: number | undefined;
 
     const sessionExpired = () => {
       stopped = true; // oturum yokken yeniden denemenin anlamı yok; giriş ekranı açılır, bu bileşen kapanır
@@ -49,7 +50,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     conn.on('TableChanged', (tableId: number) => {
       qc.invalidateQueries({ queryKey: ['tables'] });
       qc.invalidateQueries({ queryKey: ['table', tableId] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
+      // Raporlar ağır sorgu: art arda gelen olaylar en fazla 3 saniyede bir yenileme yapar.
+      if (reportsTimer === undefined) {
+        reportsTimer = window.setTimeout(() => {
+          reportsTimer = undefined;
+          qc.invalidateQueries({ queryKey: ['reports'] });
+        }, 3000);
+      }
     });
     conn.on('TablesChanged', () => {
       qc.invalidateQueries({ queryKey: ['tables'] });
@@ -106,6 +113,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     return () => {
       stopped = true;
       window.clearTimeout(retryTimer);
+      window.clearTimeout(reportsTimer);
       document.removeEventListener('visibilitychange', onVisible);
       conn.stop();
     };

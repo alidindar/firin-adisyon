@@ -3,8 +3,11 @@ import type { DailyRow } from '../../api/reports';
 import { bucketDays, formatDayShort, type ChartBucket } from '../../lib/dates';
 import { formatKurus } from '../../lib/format';
 
-const rangeLabel = (b: ChartBucket) =>
-  b.endDay === b.day ? formatDayShort(b.day) : `${formatDayShort(b.day)} – ${formatDayShort(b.endDay)}`;
+const rangeLabel = (b: ChartBucket, weekly: boolean) => {
+  const partial = weekly && b.dayCount < 7 ? ` (${b.dayCount} gün)` : '';
+  if (b.endDay === b.day) return `${formatDayShort(b.day)}${partial}`;
+  return `${formatDayShort(b.day)} – ${formatDayShort(b.endDay)}${partial}`;
+};
 
 export function DailyChart({ days }: { days: DailyRow[] }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -19,10 +22,10 @@ export function DailyChart({ days }: { days: DailyRow[] }) {
 
   return (
     <figure className="chart">
-      <figcaption className="chart-title">{weekly ? 'Haftalık ciro' : 'Günlük ciro'}</figcaption>
+      <figcaption className="chart-title">{weekly ? '7 günlük ciro toplamları' : 'Günlük ciro'}</figcaption>
       <p className="chart-tip" aria-live="polite">
         {shown
-          ? `${rangeLabel(shown)}: ${formatKurus(shown.revenueKurus)} (nakit ${formatKurus(shown.cashKurus)}, kart ${formatKurus(shown.cardKurus)})`
+          ? `${rangeLabel(shown, weekly)}: ${formatKurus(shown.revenueKurus)} (nakit ${formatKurus(shown.cashKurus)}, kart ${formatKurus(shown.cardKurus)})`
           : 'Bir sütuna dokunun ya da üzerine gelin.'}
       </p>
       <div className="columns" onMouseLeave={() => setHover(null)}>
@@ -31,7 +34,7 @@ export function DailyChart({ days }: { days: DailyRow[] }) {
             key={d.day}
             type="button"
             className={`col-slot${hover === i ? ' active' : ''}`}
-            aria-label={`${rangeLabel(d)}: ${formatKurus(d.revenueKurus)}`}
+            aria-label={`${rangeLabel(d, weekly)}: ${formatKurus(d.revenueKurus)}`}
             onMouseEnter={() => setHover(i)}
             onFocus={() => setHover(i)}
             onClick={() => setHover(i)}
@@ -45,11 +48,11 @@ export function DailyChart({ days }: { days: DailyRow[] }) {
       <details className="table-view">
         <summary>Tablo olarak göster</summary>
         <table>
-          <thead><tr><th>{weekly ? 'Hafta' : 'Gün'}</th><th>Ciro</th><th>Nakit</th><th>Kart</th></tr></thead>
+          <thead><tr><th>{weekly ? 'Dönem' : 'Gün'}</th><th>Ciro</th><th>Nakit</th><th>Kart</th></tr></thead>
           <tbody>
             {buckets.map((d) => (
               <tr key={d.day}>
-                <td>{rangeLabel(d)}</td>
+                <td>{rangeLabel(d, weekly)}</td>
                 <td>{formatKurus(d.revenueKurus)}</td>
                 <td>{formatKurus(d.cashKurus)}</td>
                 <td>{formatKurus(d.cardKurus)}</td>
