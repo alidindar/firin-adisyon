@@ -25,7 +25,7 @@ try {
     catch { throw "Firin.Api.exe 30 sn içinde kapanmadı; Görev Yöneticisi'nden kapatıp tekrar deneyin." }
 
     # Güncellemeden önce veritabanının kopyasını al (servis durdu, dosya tutarlı).
-    # Ad, uygulamanın yedek adıyla aynıdır; yalnızca Ayarlar'daki yedek klasörü varsayılan (data\backups) ise listede görünür ve 30 gün sonra silinir.
+    # Ad, uygulamanın yedek adıyla aynıdır; yedek listesinde görünür ve son yedek sayılır; 30 gün sonra, data\backups'a yeni bir yedek yazılırken silinir.
     $db = Join-Path $Target 'data\firin.db'
     if (Test-Path $db) {
         $backups = Join-Path $Target 'data\backups'
@@ -37,7 +37,7 @@ try {
         if (Test-Path "$db-wal") { Copy-Item "$db-wal" "$copy-wal" }
         Write-Host "Güncelleme öncesi yedek: $copy"
         if (Test-Path "$copy-wal") { Write-Host "  (işlenmemiş kayıtlar için: $copy-wal; geri dönerken ikisini birlikte kopyalayın)" }
-        Write-Host "  (Ayarlar'daki yedek klasörü başkaysa bu kopya listede görünmez ve otomatik silinmez.)"
+        Write-Host "  (Bu kopya data\backups içindedir; yedek listesinde görünür, 30 günden sonra o klasöre yeni yedek yazılırken silinir.)"
     }
 
     New-Item -ItemType Directory -Force $Target | Out-Null
