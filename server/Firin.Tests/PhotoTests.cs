@@ -93,4 +93,25 @@ public sealed class PhotoTests : IDisposable
         var res = await staff.PostAsync($"/api/admin/products/{p.Id}/photo", Upload(FakeJpeg));
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
+
+    [Fact]
+    public async Task Served_photo_has_nosniff()
+    {
+        var (owner, p) = await ProductAsync();
+        var dto = await (await owner.PostAsync($"/api/admin/products/{p.Id}/photo", Upload(FakeJpeg))).ReadAs<ProductDto>();
+        var served = await _app.Client.GetAsync(dto.PhotoUrl);
+        Assert.Equal(HttpStatusCode.OK, served.StatusCode);
+        Assert.Equal("nosniff", served.Headers.GetValues("X-Content-Type-Options").Single());
+    }
+
+    [Theory]
+    [InlineData("/photos/yok.jpg")]
+    [InlineData("/photos/yok")]
+    [InlineData("/photos/")]
+    public async Task Unknown_photo_is_404_not_spa(string url)
+    {
+        var res = await _app.Client.GetAsync(url);
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.DoesNotContain("<title>test</title>", await res.Content.ReadAsStringAsync());
+    }
 }

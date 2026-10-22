@@ -65,8 +65,18 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(paths.PhotosDir),
     RequestPath = "/photos",
-    OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
+    OnPrepareResponse = c =>
+    {
+        c.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        c.Context.Response.Headers.XContentTypeOptions = "nosniff";
+    },
 });
+// Bulunamayan fotoğraf SPA'ya düşmesin (uzantısız /photos/yok index.html döndürürdü).
+app.Map("/photos", b => b.Run(c =>
+{
+    c.Response.StatusCode = StatusCodes.Status404NotFound;
+    return Task.CompletedTask;
+}));
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
