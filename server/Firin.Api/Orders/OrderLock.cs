@@ -2,7 +2,7 @@ namespace Firin.Api.Orders;
 
 /// <summary>
 /// Adisyon, kalem ve ödeme üzerindeki her değişiklik bu kilidi tutmalı (tek süreçli uygulama, düşük trafik).
-/// Parça 4'teki PaymentService de aynı kilidi kullanacak.
+/// PaymentService de bu kilidi kullanır.
 /// </summary>
 public sealed class OrderLock
 {

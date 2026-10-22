@@ -23,11 +23,11 @@ public static class SettingsEndpoints
 
         g.MapGet("/", (SettingsService s, BackupService b, IConfiguration c) => ToDtoAsync(s, b, c));
 
-        g.MapPut("/", async (SettingsInput input, SettingsService s, BackupService b, IConfiguration c, FirinPaths paths) =>
+        g.MapPut("/", async (SettingsInput input, SettingsService s, BackupService b, IConfiguration c, FirinPaths paths, ILoggerFactory logs) =>
         {
             var name = string.IsNullOrWhiteSpace(input.BusinessName) ? null : Validate.Name(input.BusinessName);
             var dir = string.IsNullOrWhiteSpace(input.BackupDir) ? null : input.BackupDir.Trim();
-            if (dir is not null) EnsureWritable(dir, paths);
+            if (dir is not null) EnsureWritable(dir, paths, logs.CreateLogger("Firin.Settings"));
             await s.SetAsync(SettingsService.BusinessNameKey, name);
             var before = await b.ResolveDirAsync();
             await s.SetAsync(SettingsService.BackupDirKey, dir);
@@ -37,7 +37,7 @@ public static class SettingsEndpoints
 
         var backups = api.MapGroup("/admin/backups").RequireAuthorization(AuthSetup.OwnerPolicy);
 
-        backups.MapGet("/", async (BackupService b) => b.List(await b.ResolveDirAsync()));
+        backups.MapGet("/", (BackupService b) => b.ListAsync());
         backups.MapPost("/", (BackupService b) => b.CreateAsync());
         backups.MapGet("/{name}", async (string name, BackupService b) =>
             await b.PathOfAsync(name) is { } path
@@ -53,7 +53,7 @@ public static class SettingsEndpoints
         b.LastError,
         NetworkInfo.LanUrls(NetworkInfo.Port(c)));
 
-    private static void EnsureWritable(string dir, FirinPaths paths)
+    private static void EnsureWritable(string dir, FirinPaths paths, ILogger log)
     {
         // Servis LocalSystem olarak çalışır: eşlenmiş sürücü harfleri (Z:) ve çoğu ağ paylaşımı görünmez, klasor_yazilamiyor döner.
         if (!Path.IsPathFullyQualified(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
@@ -66,6 +66,13 @@ public static class SettingsEndpoints
             || string.Equals(full, photos, StringComparison.OrdinalIgnoreCase)
             || full.StartsWith(photos + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new DomainException("klasor_gecersiz", "Yedek klasörü veri klasörünün kendisi ya da fotoğraf klasörü olamaz.");
+        // Uygulama klasörünün altında ama veri klasörünün dışında olamaz: sonraki güncellemede robocopy /MIR onu siler.
+        var app = Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory));
+        var underApp = string.Equals(full, app, StringComparison.OrdinalIgnoreCase)
+            || full.StartsWith(app + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        var underData = full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        if (underApp && !underData)
+            throw new DomainException("klasor_gecersiz", "Yedek klasörü uygulama klasörünün içinde olamaz; bir sonraki güncelleme onu siler.");
         try
         {
             Directory.CreateDirectory(dir);
@@ -75,7 +82,8 @@ public static class SettingsEndpoints
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
-            throw new DomainException("klasor_yazilamiyor", $"Bu klasöre yazılamıyor: {ex.Message}");
+            log.LogWarning(ex, "Yedek klasörü yazma testi başarısız: {Dir}", dir);
+            throw new DomainException("klasor_yazilamiyor", $"Bu klasöre yazılamıyor: {BackupService.Explain(ex)}");
         }
     }
 }

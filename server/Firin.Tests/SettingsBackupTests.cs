@@ -57,20 +57,72 @@ public sealed class SettingsBackupTests : IDisposable
     }
 
     [Fact]
-    public async Task Failed_backup_leaves_no_file_and_reports_coded_error()
+    public async Task Unreachable_custom_dir_falls_back_to_default_dir_and_keeps_a_turkish_error()
     {
         var owner = await _app.OwnerAsync();
-        // Klasör yolunun üstünde bir dosya var: CreateDirectory başarısız olur.
+        // Özel klasörün yolunun üstünde bir dosya var (çıkarılmış USB gibi): CreateDirectory başarısız olur.
         var blocker = Path.Combine(_app.DataDir, "engel");
         await File.WriteAllTextAsync(blocker, "x");
         _app.Db(db => { db.Settings.Add(new Setting { Key = "BackupDir", Value = Path.Combine(blocker, "alt") }); db.SaveChanges(); return 0; });
 
         var res = await owner.PostAsync("/api/admin/backups", null);
-        Assert.Equal(HttpStatusCode.InternalServerError, res.StatusCode);
-        Assert.Equal("yedek_hatasi", await res.ProblemCode());
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var b = await res.ReadAs<BackupDto>();
+        Assert.True(File.Exists(Path.Combine(DefaultBackupDir, b.FileName)));
 
         var s = await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>();
+        Assert.Equal("Yedek klasörüne ulaşılamadı; yedek varsayılan klasöre alındı.", s.LastBackupError);
+        Assert.Equal(b.CreatedAt, s.LastBackupAt);
+        // Liste her iki klasörü de gösterir: yedek kaybolmaz.
+        Assert.Equal(new[] { b.FileName }, (await (await owner.GetAsync("/api/admin/backups")).ReadAs<List<BackupDto>>()).Select(x => x.FileName).ToArray());
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/admin/backups/{b.FileName}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Missing_drive_falls_back_and_recovers_when_the_folder_returns()
+    {
+        var owner = await _app.OwnerAsync();
+        var blocker = Path.Combine(_app.DataDir, "engel");
+        await File.WriteAllTextAsync(blocker, "x");
+        var usb = Path.Combine(blocker, "alt");
+        _app.Db(db => { db.Settings.Add(new Setting { Key = "BackupDir", Value = usb }); db.SaveChanges(); return 0; });
+
+        var b1 = await (await owner.PostAsync("/api/admin/backups", null)).ReadAs<BackupDto>();
+        Assert.True(File.Exists(Path.Combine(DefaultBackupDir, b1.FileName)));
+        Assert.NotNull((await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>()).LastBackupError);
+
+        _app.Clock.Advance(TimeSpan.FromMinutes(5));
+        File.Delete(blocker); // klasör yeniden ulaşılabilir (USB geri takıldı)
+        var b2 = await (await owner.PostAsync("/api/admin/backups", null)).ReadAs<BackupDto>();
+        Assert.True(File.Exists(Path.Combine(usb, b2.FileName)));
+        Assert.Null((await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>()).LastBackupError);
+    }
+
+    [Fact]
+    public async Task Nonexistent_drive_letter_falls_back_to_default_dir()
+    {
+        var letter = "QPONMLKJIHGFED".FirstOrDefault(l => !Directory.Exists(l + @":"));
+        if (letter == default) return;
+        var owner = await _app.OwnerAsync();
+        _app.Db(db => { db.Settings.Add(new Setting { Key = "BackupDir", Value = letter + @":\FirinYedek" }); db.SaveChanges(); return 0; });
+
+        var b = await (await owner.PostAsync("/api/admin/backups", null)).ReadAs<BackupDto>();
+        Assert.True(File.Exists(Path.Combine(DefaultBackupDir, b.FileName)));
+        Assert.Equal(BackupService.FallbackMessage, (await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>()).LastBackupError);
+    }
+
+    [Fact]
+    public async Task Backup_fails_with_coded_error_only_when_default_dir_fails_too()
+    {
+        var owner = await _app.OwnerAsync();
+        Directory.CreateDirectory(Path.Combine(DefaultBackupDir, "firin-20261021-060000.db")); // varsayılan klasörde de yazılamaz
+        var res = await owner.PostAsync("/api/admin/backups", null);
+        Assert.Equal(HttpStatusCode.InternalServerError, res.StatusCode);
+        Assert.Equal("yedek_hatasi", await res.ProblemCode());
+        var s = await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>();
         Assert.NotNull(s.LastBackupError);
+        Assert.DoesNotContain("Access", s.LastBackupError);
+        Assert.DoesNotContain("path", s.LastBackupError);
     }
 
     [Fact]
@@ -133,6 +185,23 @@ public sealed class SettingsBackupTests : IDisposable
         var res = await owner.PutAsJsonAsync("/api/admin/settings", new { businessName = (string?)null, backupDir = Path.Combine(blocker, "alt") });
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         Assert.Equal("klasor_yazilamiyor", await res.ProblemCode());
+        var detail = await res.ProblemDetail();
+        Assert.StartsWith("Bu klasöre yazılamıyor", detail);
+        Assert.DoesNotContain("Could not", detail);
+        Assert.DoesNotContain("path", detail);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("yedek")]
+    public async Task Backup_dir_under_app_folder_outside_data_is_rejected(string sub)
+    {
+        var owner = await _app.OwnerAsync();
+        var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, sub, "FirinYedekTest"));
+        var res = await owner.PutAsJsonAsync("/api/admin/settings", new { businessName = (string?)null, backupDir = dir });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        Assert.Equal("klasor_gecersiz", await res.ProblemCode());
+        Assert.False(Directory.Exists(dir));
     }
 
     [Fact]
@@ -321,5 +390,19 @@ public sealed class SettingsBackupTests : IDisposable
         Assert.True(AutoBackupService.IsDue(now.AddDays(40), now));
         Assert.True(AutoBackupService.IsDue(now.AddHours(-24), now));
         Assert.False(AutoBackupService.IsDue(now.AddHours(-23), now));
+    }
+
+    [Fact]
+    public void Latest_backup_ignores_future_dated_files()
+    {
+        var now = new DateTime(2026, 10, 21, 6, 0, 0, DateTimeKind.Utc);
+        var list = new List<BackupDto>
+        {
+            new("firin-future.db", 1, now.AddDays(40)),
+            new("firin-recent.db", 1, now.AddHours(-2)),
+        };
+        var latest = AutoBackupService.Latest(list, now);
+        Assert.Equal("firin-recent.db", latest!.FileName);
+        Assert.False(AutoBackupService.IsDue(latest.CreatedAt, now));
     }
 }

@@ -117,6 +117,12 @@ public static class HttpExt
     public static async Task<T> ReadAs<T>(this HttpResponseMessage res) =>
         (await res.Content.ReadFromJsonAsync<T>(TestApp.Json))!;
 
+    public static async Task<string?> ProblemDetail(this HttpResponseMessage res)
+    {
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        return doc.RootElement.TryGetProperty("title", out var c) ? c.GetString() : null;
+    }
+
     public static async Task<string?> ProblemCode(this HttpResponseMessage res)
     {
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());

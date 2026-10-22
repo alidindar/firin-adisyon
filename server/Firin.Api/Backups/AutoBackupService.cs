@@ -15,6 +15,10 @@ public sealed class AutoBackupService(BackupService backups, PhotoCleanup photos
         return age < TimeSpan.Zero || age >= TimeSpan.FromHours(24);
     }
 
+    /// <summary>Gelecek tarihli (saat hatasıyla kalmış) dosyalar "son yedek" sayılmaz.</summary>
+    public static BackupDto? Latest(IEnumerable<BackupDto> backups, DateTime nowUtc) =>
+        backups.OrderByDescending(b => b.CreatedAt).FirstOrDefault(b => b.CreatedAt <= nowUtc);
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         if (!config.GetValue("Firin:AutoBackup", true)) return;
@@ -23,8 +27,9 @@ public sealed class AutoBackupService(BackupService backups, PhotoCleanup photos
         {
             try
             {
-                var latest = backups.List(await backups.ResolveDirAsync()).FirstOrDefault();
-                if (IsDue(latest?.CreatedAt, clock.GetUtcNow().UtcDateTime))
+                var now = clock.GetUtcNow().UtcDateTime;
+                var latest = Latest(await backups.ListAsync(), now);
+                if (IsDue(latest?.CreatedAt, now))
                     await backups.CreateAsync();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

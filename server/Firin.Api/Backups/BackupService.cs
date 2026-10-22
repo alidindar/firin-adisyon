@@ -28,10 +28,13 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
 
     public void ClearError() => LastError = null;
 
-    /// <summary>Bu oturumda alınan son yedek; yeniden başlatma sonrası klasördeki en yeni yedeğe bakılır.</summary>
-    public async Task<DateTime?> GetLastBackupAtAsync() =>
-        _lastBackupAt ?? List(await ResolveDirAsync()).FirstOrDefault()?.CreatedAt;
+    public const string FallbackMessage = "Yedek klasörüne ulaşılamadı; yedek varsayılan klasöre alındı.";
 
+    /// <summary>Bu oturumda alınan son yedek; yeniden başlatma sonrası klasörlerdeki en yeni yedeğe bakılır.</summary>
+    public async Task<DateTime?> GetLastBackupAtAsync() =>
+        _lastBackupAt ?? (await ListAsync()).FirstOrDefault()?.CreatedAt;
+
+    /// <summary>Ayarlanan yedek klasörü (boşsa varsayılan). Yedek alınamazsa varsayılana düşülür, bkz. CreateAsync.</summary>
     public async Task<string> ResolveDirAsync()
     {
         using var scope = scopes.CreateScope();
@@ -39,15 +42,58 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
         return string.IsNullOrWhiteSpace(custom) ? paths.BackupsDir : custom;
     }
 
+    /// <summary>Ayarlı klasör ile varsayılan klasördeki yedekler birlikte, yeniden eskiye. Yedek geri düştüyse de görünür kalır.</summary>
+    public async Task<List<BackupDto>> ListAsync()
+    {
+        var dir = await ResolveDirAsync();
+        var all = List(dir);
+        if (!SamePath(dir, paths.BackupsDir)) all.AddRange(List(paths.BackupsDir));
+        return all.DistinctBy(b => b.FileName).OrderByDescending(b => b.CreatedAt).ToList();
+    }
+
+    /// <summary>
+    /// Önce ayarlı klasöre yazar. Ulaşılamıyorsa (USB çıkarıldı, sürücü harfi değişti) aynı yedeği varsayılan klasöre alır,
+    /// LastError'u Türkçe açıklamayla bırakır ve yine başarılı döner; hiç yedeksiz kalınmaz. İkisi de olmazsa yedek_hatasi.
+    /// </summary>
     public async Task<BackupDto> CreateAsync()
     {
         await _lock.WaitAsync();
-        string? tmp = null;
         try
         {
             var dir = await ResolveDirAsync();
-            Directory.CreateDirectory(dir);
             var now = clock.GetUtcNow().UtcDateTime;
+            try
+            {
+                var dto = await WriteAsync(dir, now);
+                LastError = null;
+                return dto;
+            }
+            catch (Exception ex) when (IsFileError(ex) && !SamePath(dir, paths.BackupsDir))
+            {
+                log.LogWarning(ex, "Yedek klasörüne yazılamadı ({Dir}); varsayılan klasöre alınıyor", dir);
+                var dto = await WriteAsync(paths.BackupsDir, now);
+                LastError = FallbackMessage;
+                return dto;
+            }
+        }
+        catch (Exception ex) when (IsFileError(ex))
+        {
+            LastError = $"Yedek alınamadı: {Explain(ex)}";
+            log.LogError(ex, "Yedek alınamadı");
+            throw new DomainException("yedek_hatasi", LastError, StatusCodes.Status500InternalServerError);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private async Task<BackupDto> WriteAsync(string dir, DateTime now)
+    {
+        string? tmp = null;
+        try
+        {
+            Directory.CreateDirectory(dir);
             var name = $"firin-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}.db";
             var path = Path.Combine(dir, name);
             tmp = path + ".tmp";
@@ -70,14 +116,7 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
 
             Prune(dir, now);
             _lastBackupAt = now;
-            LastError = null;
             return new BackupDto(name, new FileInfo(path).Length, now);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException or ArgumentException or NotSupportedException)
-        {
-            LastError = ex.Message;
-            log.LogError(ex, "Yedek alınamadı");
-            throw new DomainException("yedek_hatasi", $"Yedek alınamadı: {ex.Message}", StatusCodes.Status500InternalServerError);
         }
         finally
         {
@@ -85,9 +124,26 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
             {
                 try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             }
-            _lock.Release();
         }
     }
+
+    private static bool IsFileError(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or SqliteException or ArgumentException or NotSupportedException;
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>.NET istisna metinleri İngilizcedir; kullanıcıya kısa Türkçe karşılığı gösterilir (özgün hata günlüğe yazılır).</summary>
+    public static string Explain(Exception ex) => ex switch
+    {
+        DirectoryNotFoundException => "klasör ya da sürücü bulunamadı.",
+        UnauthorizedAccessException => "klasöre yazma izni yok.",
+        SqliteException => "veritabanı okunamadı.",
+        ArgumentException or NotSupportedException => "klasör yolu geçersiz.",
+        IOException => "klasöre yazılamadı (disk dolu, çıkarılmış ya da kullanımda olabilir).",
+        _ => "beklenmeyen bir hata oluştu.",
+    };
 
     public List<BackupDto> List(string dir)
     {
@@ -105,8 +161,12 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
     public async Task<string?> PathOfAsync(string name)
     {
         if (StampOf(name) is null) return null; // yalnızca bizim adlandırdığımız dosyalar; yol geçişi olmaz
-        var path = Path.Combine(await ResolveDirAsync(), name);
-        return File.Exists(path) ? path : null;
+        foreach (var dir in new[] { await ResolveDirAsync(), paths.BackupsDir })
+        {
+            var path = Path.Combine(dir, name);
+            if (File.Exists(path)) return path;
+        }
+        return null;
     }
 
     private void Prune(string dir, DateTime nowUtc)
