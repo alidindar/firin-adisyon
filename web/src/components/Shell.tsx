@@ -4,6 +4,7 @@ import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { AdminPage } from '../pages/admin/AdminPage';
+import { ReportsPage } from '../pages/reports/ReportsPage';
 import { TablesPage } from '../pages/TablesPage';
 import { TableDetailPage } from '../pages/table/TableDetailPage';
 import { RealtimeProvider, useConnection } from '../realtime/RealtimeProvider';
@@ -47,6 +48,7 @@ function ShellLayout({ me }: { me: Me }) {
         <header className="shell-header">
           <nav>
             <NavLink to="/" end>Masalar</NavLink>
+            {isOwner && <NavLink to="/raporlar">Raporlar</NavLink>}
             {isOwner && <NavLink to="/yonetim">Yönetim</NavLink>}
           </nav>
           <div className="shell-user">
@@ -63,6 +65,7 @@ function ShellLayout({ me }: { me: Me }) {
           <Route path="/" element={<TablesPage />} />
           <Route path="/masa/:id" element={<TableDetailPage />} />
           {isOwner && <Route path="/yonetim/*" element={<AdminPage />} />}
+          {isOwner && <Route path="/raporlar" element={<ReportsPage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

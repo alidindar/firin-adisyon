@@ -49,6 +49,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     conn.on('TableChanged', (tableId: number) => {
       qc.invalidateQueries({ queryKey: ['tables'] });
       qc.invalidateQueries({ queryKey: ['table', tableId] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
     });
     conn.on('TablesChanged', () => {
       qc.invalidateQueries({ queryKey: ['tables'] });

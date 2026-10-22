@@ -30,7 +30,7 @@ export function ProductsAdmin() {
         const items = products.data.filter((p) => p.categoryId === c.id);
         if (items.length === 0) return null;
         return (
-          <section key={c.id}>
+          <section key={c.id} className="cat-group">
             <h3>{c.name}</h3>
             <ul className="admin-list">
               {items.map((p) => (
