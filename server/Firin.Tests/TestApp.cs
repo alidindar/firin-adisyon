@@ -26,7 +26,7 @@ public sealed class TestApp : IDisposable
     public WebApplicationFactory<Program> Factory { get; }
     public HttpClient Client { get; }
 
-    public TestApp()
+    public TestApp(Action<IServiceCollection>? configure = null)
     {
         // Gerçek wwwroot/index.html olmadan SPA fallback sınanamaz.
         var webRoot = Path.Combine(DataDir, "wwwroot");
@@ -42,6 +42,7 @@ public sealed class TestApp : IDisposable
             {
                 s.RemoveAll<TimeProvider>();
                 s.AddSingleton<TimeProvider>(Clock);
+                configure?.Invoke(s);
             });
         });
         Client = Factory.CreateClient();

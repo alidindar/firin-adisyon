@@ -19,4 +19,7 @@ public record SummaryDto(DateOnly From, DateOnly To, long RevenueKurus, long Cas
 public record OrderHistoryDto(int Id, string TableName, OrderStatus Status, DateTime OpenedAt, DateTime? ClosedAt,
     long TotalKurus, long PaidKurus, int ItemCount);
 
+/// <summary>HasMore: aralıkta gösterilenden daha eski hesaplar da var (liste son 200 ile sınırlı).</summary>
+public record OrderHistoryResultDto(List<OrderHistoryDto> Orders, bool HasMore);
+
 public record OrderAuditDto(OrderDto Order, string TableName, List<VoidDto> Voids);
