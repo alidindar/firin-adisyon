@@ -18,6 +18,7 @@ if ($LASTEXITCODE) { throw 'sunucu testleri başarısız' }
 $out = Join-Path $root 'publish\FirinAdisyon'
 # Eski çıktı (örn. exe elle çalıştırılınca oluşan data\) yayına karışmasın.
 Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
+if (Test-Path $out) { throw "Yayın klasörü silinemedi; açık Firin.Api.exe varsa kapatıp tekrar deneyin." }
 dotnet publish (Join-Path $root 'server\Firin.Api') -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -o $out
 if ($LASTEXITCODE) { throw 'yayın başarısız' }
 

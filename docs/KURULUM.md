@@ -7,9 +7,9 @@
    powershell -ExecutionPolicy Bypass -File scripts\publish.ps1
    ```
    Betik web arayüzünü derler, testleri çalıştırır ve .NET kurulumu gerektirmeyen bir yayın hazırlar (`publish\FirinAdisyon`).
-2. PowerShell'i **Yönetici olarak** açıp servisi kurun. Yönetici PowerShell `C:\Windows\System32` içinde açılır; önce proje klasörüne geçin:
+2. PowerShell'i **Yönetici olarak** açıp servisi kurun. Yönetici PowerShell `C:\Windows\System32` içinde açılır; önce proje klasörüne geçin (örnekteki yolu kendi proje klasörünüzün gerçek yoluyla, tırnak içinde değiştirin):
    ```powershell
-   cd "<proje klasörü>"
+   cd "C:\Users\Ali G\Desktop\firin-adisyon"
    powershell -ExecutionPolicy Bypass -File scripts\install-service.ps1
    ```
    Betik şunları yapar:
