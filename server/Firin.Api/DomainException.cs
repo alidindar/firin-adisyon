@@ -15,10 +15,16 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problems) : IE
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext ctx, Exception ex, CancellationToken ct)
     {
-        if (ex is not DomainException de) return false;
-        ctx.Response.StatusCode = de.Status;
-        var details = new ProblemDetails { Status = de.Status, Title = de.Message };
-        details.Extensions["code"] = de.Code;
+        var (status, code, message) = ex switch
+        {
+            DomainException de => (de.Status, de.Code, de.Message),
+            BadHttpRequestException bad => (bad.StatusCode, "istek_gecersiz", "İstek okunamadı. Sayfayı yenileyip tekrar deneyin."),
+            _ => (0, "", ""),
+        };
+        if (status == 0) return false;
+        ctx.Response.StatusCode = status;
+        var details = new ProblemDetails { Status = status, Title = message };
+        details.Extensions["code"] = code;
         return await problems.TryWriteAsync(new ProblemDetailsContext { HttpContext = ctx, ProblemDetails = details });
     }
 }

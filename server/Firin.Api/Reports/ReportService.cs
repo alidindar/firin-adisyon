@@ -9,29 +9,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Firin.Api.Reports;
 
 /// <summary>Salt okunur: hiçbir yol yazmaz, bu yüzden OrderLock almaz. AddItemAsync, SetQuantityAsync ya da VoidItemAsync çağırmamalı.</summary>
-public sealed class ReportService(AppDb db, OrderService orders, TimeProvider clock, IConfiguration config)
+public sealed class ReportService(AppDb db, OrderService orders, TimeProvider clock, TimeZoneInfo tz)
 {
     public const int MaxDays = 366;
     public const int HistoryLimit = 200;
     private const int MinYear = 2000, MaxYear = 2100;
 
-    private readonly TimeZoneInfo _tz = FindZone(config["Firin:TimeZone"] is { Length: > 0 } z ? z : "Europe/Istanbul");
-
-    private static TimeZoneInfo FindZone(string id)
-    {
-        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-        catch (TimeZoneNotFoundException) when (id == "Europe/Istanbul")
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
-        }
-    }
-
     public DateOnly Today => LocalDay(clock.GetUtcNow().UtcDateTime);
 
-    private DateOnly LocalDay(DateTime utc) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, _tz));
+    private DateOnly LocalDay(DateTime utc) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, tz));
 
     private DateTime StartOfDayUtc(DateOnly day) =>
-        TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), _tz);
+        TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
 
     /// <summary>yyyy-MM-dd; boşsa null. Geçersizse tarih_gecersiz.</summary>
     public static DateOnly? ParseDay(string? s)

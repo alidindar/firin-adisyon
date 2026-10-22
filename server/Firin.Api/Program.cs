@@ -24,14 +24,24 @@ builder.Services.AddSingleton<IRealtime, SignalRRealtime>();
 builder.Services.AddSingleton<OrderLock>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<PaymentService>();
+// Saat dilimi açılışta bir kez çözülür; yanlış kimlik her istekte 500 yerine açılışta net bir hatayla durdurur.
+builder.Services.AddSingleton(sp => ResolveTimeZone(sp.GetRequiredService<IConfiguration>()["Firin:TimeZone"]));
 builder.Services.AddScoped<ReportService>();
+// Production'da da bozuk istek gövdesi DomainExceptionHandler'a ulaşsın (varsayılan yalnızca Development).
+builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var app = builder.Build();
 var paths = app.Services.GetRequiredService<FirinPaths>(); // klasörleri hemen oluştur
+app.Services.GetRequiredService<TimeZoneInfo>(); // yanlış Firin:TimeZone burada patlasın
 using (var scope = app.Services.CreateScope())
-    scope.ServiceProvider.GetRequiredService<AppDb>().Database.Migrate();
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+    db.Database.Migrate();
+    // WAL: yedek ve raporlar yazanları bloklamaz. Kalıcı ayardır (dosyada durur). synchronous=FULL kalır: para satırları elektrik kesilince de durmalı.
+    db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+}
 
 // index.html asla önbelleğe alınmasın; yayından sonra eski sayfa silinmiş hash'li dosyalara bakmasın.
 var staticFiles = new StaticFileOptions
@@ -71,4 +81,19 @@ app.MapFallbackToFile("index.html", staticFiles);
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    internal static TimeZoneInfo ResolveTimeZone(string? configured)
+    {
+        var id = string.IsNullOrWhiteSpace(configured) ? "Europe/Istanbul" : configured;
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+        catch (TimeZoneNotFoundException) when (id == "Europe/Istanbul")
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+        }
+        catch (TimeZoneNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Firin:TimeZone geçersiz: '{id}'. Örnek: Europe/Istanbul", ex);
+        }
+    }
+}

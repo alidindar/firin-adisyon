@@ -37,6 +37,6 @@ public sealed class FirinPathsTests : IDisposable
     }
 
     [Fact]
-    public void Empty_DataDir_defaults_to_content_root_data() =>
-        Assert.Equal(Path.Combine(_root, "data"), Make(null).DataDir);
+    public void Empty_DataDir_defaults_to_exe_folder_data() =>
+        Assert.Equal(Path.Combine(AppContext.BaseDirectory, "data"), Make(null).DataDir);
 }
