@@ -1,10 +1,11 @@
-# web/public altina icon-192.png, icon-512.png ve apple-touch-icon.png (180) uretir.
+# web/public altina icon-192.png, icon-512.png (yuvarlak koseli, "any") ile icon-maskable-512.png ve
+# apple-touch-icon.png (180) (tam kaplayan kare: seffaf kose yok, isletim sistemi kendi maskesini uygular) uretir.
 # icon.svg ile ayni cizim: kahverengi yuvarlak kare + krem somun + uc cizik.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $out = Join-Path (Split-Path $PSScriptRoot -Parent) 'web\public'
 
-function New-Icon([int]$size, [string]$name) {
+function New-Icon([int]$size, [string]$name, [bool]$fullBleed = $false) {
     $bmp = New-Object System.Drawing.Bitmap $size, $size
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
@@ -19,7 +20,7 @@ function New-Icon([int]$size, [string]$name) {
     $path.AddArc($size - $d, $size - $d, $d, $d, 0, 90)
     $path.AddArc(0, $size - $d, $d, $d, 90, 90)
     $path.CloseFigure()
-    $g.FillPath((New-Object System.Drawing.SolidBrush $brown), $path)
+    if ($fullBleed) { $g.Clear($brown) } else { $g.FillPath((New-Object System.Drawing.SolidBrush $brown), $path) }
 
     $g.FillEllipse((New-Object System.Drawing.SolidBrush $cream), (86 * $s), (168 * $s), (340 * $s), (216 * $s))
 
@@ -36,4 +37,5 @@ function New-Icon([int]$size, [string]$name) {
 
 New-Icon 192 'icon-192.png'
 New-Icon 512 'icon-512.png'
-New-Icon 180 'apple-touch-icon.png'
+New-Icon 512 'icon-maskable-512.png' $true
+New-Icon 180 'apple-touch-icon.png' $true

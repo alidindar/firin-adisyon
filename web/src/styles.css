@@ -116,8 +116,8 @@ button.icon { min-width: 48px; padding: 0; font-size: 1.2rem; }
 .thumb.placeholder { display: inline-grid; place-items: center; background: var(--busy); font-size: 1.5rem; }
 .thumb.large.placeholder { font-size: 3rem; }
 
-.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
-.modal { width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; background: var(--surface); border-radius: var(--radius); padding: 16px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; padding: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.modal { width: min(520px, 100%); max-height: calc(100dvh - 32px - env(safe-area-inset-bottom, 0px)); overflow: auto; background: var(--surface); border-radius: var(--radius); padding: 16px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .modal-head h2 { margin: 0; font-size: 1.2rem; }
 
@@ -291,7 +291,7 @@ code { overflow-wrap: anywhere; }
 .lbl-short { display: none; }
 
 /* Kontroller: anında dokunma, uzun basınca seçim/menü yok. İçerik metni seçilebilir kalır. */
-a, [role='button'] { touch-action: manipulation; }
+a, [role='button'], summary, label { touch-action: manipulation; }
 .shell-header nav a, .tabs a, a.row-btn {
   user-select: none;
   -webkit-user-select: none;
@@ -306,7 +306,7 @@ a.row-btn { transition: transform 100ms ease-out, background-color 100ms ease-ou
 
 /* Hover yalnızca fare gibi hassas işaretçilerde; dokunmatikte takılı kalmaz. */
 @media (hover: hover) and (pointer: fine) {
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled):not(.danger) { border-color: var(--accent); }
   .shell-header nav a:hover, .tabs a:hover { color: var(--accent); }
 }
 

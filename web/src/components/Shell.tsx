@@ -53,7 +53,7 @@ function ShellLayout({ me }: { me: Me }) {
           </nav>
           <div className="shell-user">
             <span>{me.name}</span>
-            <button onClick={logout} aria-label="Kullanıcı değiştir">
+            <button onClick={logout} aria-label="Çıkış — kullanıcı değiştir">
               <span className="lbl-long">Kullanıcı değiştir</span>
               <span className="lbl-short" aria-hidden="true">Çıkış</span>
             </button>
