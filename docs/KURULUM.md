@@ -2,6 +2,10 @@
 
 ## 1. Kasa bilgisayarına kurulum
 
+**Kısa yol (kasa PC'de .NET ya da Node gerekmez):** Geliştirme bilgisayarında proje klasöründe `scripts\publish.ps1`, ardından `scripts\paket.ps1` çalıştırın. Oluşan `paket\FirinAdisyon-Kurulum` klasörünü USB belleğe, oradan kasa PC'nin masaüstüne kopyalayın. Klasördeki **`Kur.cmd`** dosyasına sağ tıklayıp **Yönetici olarak çalıştır**'ı seçin ve Windows onayında **Evet**'e basın. Sonra aşağıdaki 3. ve 4. adımlara geçin. Güncellemede aynısını yeni paketle yapın; kaldırmak için `Kaldir.cmd` aynı şekilde çalıştırılır.
+
+Elle kurulum:
+
 1. Yayını üretin. Bu adım için bilgisayarda **.NET 10 SDK** ve **Node 24** kurulu olmalıdır. Kasa PC'de yoksa yayını geliştirme bilgisayarında üretip proje klasörünü `publish\FirinAdisyon` ile birlikte kasa PC'ye kopyalayın. Proje klasöründe PowerShell açın:
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\publish.ps1
@@ -22,7 +26,7 @@
 
 ### Güncelleme
 
-Aynı iki komutu yeniden çalıştırın. Veriler korunur. Betik güncellemeden önce veritabanının bir kopyasını `C:\FirinAdisyon\data\backups` klasörüne alır (`firin-…db`) ve tam yolunu ekrana yazar. Ayarlar'da **başka bir yedek klasörü** (örn. USB) seçiliyse bu kopya yine de yedek listesinde görünür ve "son yedek" sayılır (liste `dataackups` klasörünü de gösterir). Kopya yalnızca `dataackups` klasörüne yeni bir yedek yazıldığında 30 günü geçtiyse silinir; gerekirse elle silebilirsiniz. Servis düzgün kapanmadıysa kopyanın yanında bir `-wal` dosyası da olur (bkz. Yedekten geri dönme). Yayın klasöründe (`publish\FirinAdisyon`) `data` klasörü varsa betik, verilerin üzerine yazılmasın diye durur; o klasörü silin.
+Aynı iki komutu yeniden çalıştırın. Veriler korunur. Betik güncellemeden önce veritabanının bir kopyasını `C:\FirinAdisyon\data\backups` klasörüne alır (`firin-…db`) ve tam yolunu ekrana yazar. Ayarlar'da **başka bir yedek klasörü** (örn. USB) seçiliyse bu kopya yine de yedek listesinde görünür ve "son yedek" sayılır (liste `data\backups` klasörünü de gösterir). Kopya yalnızca `data\backups` klasörüne yeni bir yedek yazıldığında 30 günü geçtiyse silinir; gerekirse elle silebilirsiniz. Servis düzgün kapanmadıysa kopyanın yanında bir `-wal` dosyası da olur (bkz. Yedekten geri dönme). Yayın klasöründe (`publish\FirinAdisyon`) `data` klasörü varsa betik, verilerin üzerine yazılmasın diye durur; o klasörü silin.
 
 ### Klasörler
 
