@@ -18,13 +18,15 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
     private readonly SemaphoreSlim _lock = new(1, 1);
     private DateTime? _lastBackupAt;
 
-    [GeneratedRegex(@"^firin-(\d{8}-\d{6})\.db$")]
+    [GeneratedRegex(@"^firin-([0-9]{8}-[0-9]{6})\.db\z")]
     private static partial Regex NamePattern();
 
-    [GeneratedRegex(@"^firin-\d{8}-\d{6}\.db\.tmp$")]
+    [GeneratedRegex(@"^firin-[0-9]{8}-[0-9]{6}\.db\.tmp(-journal|-wal|-shm)?\z")]
     private static partial Regex TmpPattern();
 
     public string? LastError { get; private set; }
+
+    public void ClearError() => LastError = null;
 
     /// <summary>Bu oturumda alınan son yedek; yeniden başlatma sonrası klasördeki en yeni yedeğe bakılır.</summary>
     public async Task<DateTime?> GetLastBackupAtAsync() =>
@@ -58,6 +60,10 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
                 await src.OpenAsync();
                 await dst.OpenAsync();
                 src.BackupDatabase(dst);
+                // Kaynak WAL'dedir; yedek tek başına, yanında -wal/-shm istemeyen bir dosya olsun (salt okunur ortamda da açılır).
+                await using var pragma = dst.CreateCommand();
+                pragma.CommandText = "PRAGMA journal_mode=DELETE;";
+                await pragma.ExecuteNonQueryAsync();
             }
             File.Move(tmp, path, overwrite: true);
             tmp = null;
@@ -86,12 +92,14 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
     public List<BackupDto> List(string dir)
     {
         if (!Directory.Exists(dir)) return [];
-        return Directory.EnumerateFiles(dir, "firin-*.db")
-            .Select(p => (Path: p, Stamp: StampOf(Path.GetFileName(p))))
-            .Where(x => x.Stamp is not null)
-            .OrderByDescending(x => x.Stamp)
-            .Select(x => new BackupDto(Path.GetFileName(x.Path), new FileInfo(x.Path).Length, x.Stamp!.Value))
-            .ToList();
+        var list = new List<BackupDto>();
+        foreach (var p in Directory.EnumerateFiles(dir, "firin-*.db"))
+        {
+            if (StampOf(Path.GetFileName(p)) is not { } stamp) continue;
+            try { list.Add(new BackupDto(Path.GetFileName(p), new FileInfo(p).Length, stamp)); }
+            catch (FileNotFoundException) { } // listelerken silindi
+        }
+        return list.OrderByDescending(b => b.CreatedAt).ToList();
     }
 
     public async Task<string?> PathOfAsync(string name)
@@ -106,16 +114,16 @@ public sealed partial class BackupService(FirinPaths paths, IServiceScopeFactory
         foreach (var b in List(dir).Where(b => b.CreatedAt < nowUtc.AddDays(-KeepDays)))
         {
             try { File.Delete(Path.Combine(dir, b.FileName)); }
-            catch (IOException ex) { log.LogWarning(ex, "Eski yedek silinemedi: {File}", b.FileName); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { log.LogWarning(ex, "Eski yedek silinemedi: {File}", b.FileName); }
         }
         // Çökme ya da elektrik kesintisiyle kalmış yarım yedekler.
-        foreach (var t in Directory.EnumerateFiles(dir, "firin-*.tmp").Where(t => TmpPattern().IsMatch(Path.GetFileName(t))))
+        foreach (var t in Directory.EnumerateFiles(dir, "firin-*.tmp*").Where(t => TmpPattern().IsMatch(Path.GetFileName(t))))
         {
             try
             {
                 if (File.GetLastWriteTimeUtc(t) < nowUtc.AddHours(-1)) File.Delete(t);
             }
-            catch (IOException ex) { log.LogWarning(ex, "Yarım yedek silinemedi: {File}", t); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { log.LogWarning(ex, "Yarım yedek silinemedi: {File}", t); }
         }
     }
 

@@ -232,4 +232,94 @@ public sealed class SettingsBackupTests : IDisposable
         Assert.True(File.Exists(referenced));
         Assert.True(File.Exists(fresh));
     }
+
+    [Fact]
+    public async Task Failed_move_leaves_no_tmp_and_lists_nothing()
+    {
+        var owner = await _app.OwnerAsync();
+        // Hedef adla bir KLASÖR var: File.Move başarısız olur, .tmp temizlenmeli.
+        Directory.CreateDirectory(Path.Combine(DefaultBackupDir, "firin-20261021-060000.db"));
+
+        var res = await owner.PostAsync("/api/admin/backups", null);
+        Assert.Equal(HttpStatusCode.InternalServerError, res.StatusCode);
+        Assert.Equal("yedek_hatasi", await res.ProblemCode());
+        Assert.Empty(Directory.GetFiles(DefaultBackupDir, "*.tmp*"));
+        Assert.Empty(await (await owner.GetAsync("/api/admin/backups")).ReadAs<List<BackupDto>>());
+    }
+
+    [Fact]
+    public async Task Backup_is_a_single_self_contained_file()
+    {
+        var owner = await _app.OwnerAsync();
+        var b = await (await owner.PostAsync("/api/admin/backups", null)).ReadAs<BackupDto>();
+        var bytes = await File.ReadAllBytesAsync(Path.Combine(DefaultBackupDir, b.FileName));
+        Assert.Equal(1, bytes[18]); // dosya biçimi: rollback journal (WAL değil)
+        Assert.Equal(1, bytes[19]);
+    }
+
+    [Fact]
+    public async Task Readonly_old_backup_does_not_fail_the_new_one_and_stale_tmp_leftovers_are_removed()
+    {
+        var owner = await _app.OwnerAsync();
+        Directory.CreateDirectory(DefaultBackupDir);
+        var old = Path.Combine(DefaultBackupDir, "firin-20260901-120000.db");
+        await File.WriteAllTextAsync(old, "x");
+        File.SetAttributes(old, FileAttributes.ReadOnly);
+        var stale = new[] { ".tmp", ".tmp-journal", ".tmp-wal", ".tmp-shm" }
+            .Select(e => Path.Combine(DefaultBackupDir, "firin-20261020-010101.db" + e)).ToArray();
+        foreach (var f in stale)
+        {
+            await File.WriteAllTextAsync(f, "x");
+            File.SetLastWriteTimeUtc(f, _app.Clock.GetUtcNow().UtcDateTime.AddHours(-3));
+        }
+        try
+        {
+            var res = await owner.PostAsync("/api/admin/backups", null);
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            Assert.All(stale, f => Assert.False(File.Exists(f)));
+            var s = await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>();
+            Assert.Null(s.LastBackupError);
+        }
+        finally
+        {
+            File.SetAttributes(old, FileAttributes.Normal);
+        }
+    }
+
+    [Theory]
+    [InlineData("photos")]
+    [InlineData("photos/alt")]
+    [InlineData("")]
+    public async Task Backup_dir_inside_photos_or_data_root_is_rejected(string sub)
+    {
+        var owner = await _app.OwnerAsync();
+        var dir = Path.GetFullPath(Path.Combine(_app.DataDir, sub));
+        var res = await owner.PutAsJsonAsync("/api/admin/settings", new { businessName = (string?)null, backupDir = dir });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        Assert.Equal("klasor_gecersiz", await res.ProblemCode());
+    }
+
+    [Fact]
+    public async Task Changing_backup_dir_clears_last_error()
+    {
+        var owner = await _app.OwnerAsync();
+        var blocker = Path.Combine(_app.DataDir, "engel");
+        await File.WriteAllTextAsync(blocker, "x");
+        _app.Db(db => { db.Settings.Add(new Setting { Key = "BackupDir", Value = Path.Combine(blocker, "alt") }); db.SaveChanges(); return 0; });
+        await owner.PostAsync("/api/admin/backups", null);
+        Assert.NotNull((await (await owner.GetAsync("/api/admin/settings")).ReadAs<SettingsDto>()).LastBackupError);
+
+        var res = await owner.PutAsJsonAsync("/api/admin/settings", new { businessName = (string?)null, backupDir = Path.Combine(_app.DataDir, "usb") });
+        Assert.Null((await res.ReadAs<SettingsDto>()).LastBackupError);
+    }
+
+    [Fact]
+    public void Future_dated_latest_backup_counts_as_due()
+    {
+        var now = new DateTime(2026, 10, 21, 6, 0, 0, DateTimeKind.Utc);
+        Assert.True(AutoBackupService.IsDue(null, now));
+        Assert.True(AutoBackupService.IsDue(now.AddDays(40), now));
+        Assert.True(AutoBackupService.IsDue(now.AddHours(-24), now));
+        Assert.False(AutoBackupService.IsDue(now.AddHours(-23), now));
+    }
 }

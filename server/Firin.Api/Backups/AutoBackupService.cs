@@ -7,6 +7,14 @@ namespace Firin.Api.Backups;
 public sealed class AutoBackupService(BackupService backups, PhotoCleanup photos, TimeProvider clock, IConfiguration config, ILogger<AutoBackupService> log)
     : BackgroundService
 {
+    /// <summary>Yedek yoksa, 24 saatten eskiyse ya da saat geri alınmış gibi gelecekteyse yeni yedek gerekir.</summary>
+    public static bool IsDue(DateTime? latest, DateTime nowUtc)
+    {
+        if (latest is null) return true;
+        var age = nowUtc - latest.Value;
+        return age < TimeSpan.Zero || age >= TimeSpan.FromHours(24);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         if (!config.GetValue("Firin:AutoBackup", true)) return;
@@ -16,7 +24,7 @@ public sealed class AutoBackupService(BackupService backups, PhotoCleanup photos
             try
             {
                 var latest = backups.List(await backups.ResolveDirAsync()).FirstOrDefault();
-                if (latest is null || clock.GetUtcNow().UtcDateTime - latest.CreatedAt >= TimeSpan.FromHours(24))
+                if (IsDue(latest?.CreatedAt, clock.GetUtcNow().UtcDateTime))
                     await backups.CreateAsync();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

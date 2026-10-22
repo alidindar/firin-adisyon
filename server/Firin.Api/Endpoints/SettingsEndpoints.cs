@@ -23,13 +23,15 @@ public static class SettingsEndpoints
 
         g.MapGet("/", (SettingsService s, BackupService b, IConfiguration c) => ToDtoAsync(s, b, c));
 
-        g.MapPut("/", async (SettingsInput input, SettingsService s, BackupService b, IConfiguration c) =>
+        g.MapPut("/", async (SettingsInput input, SettingsService s, BackupService b, IConfiguration c, FirinPaths paths) =>
         {
             var name = string.IsNullOrWhiteSpace(input.BusinessName) ? null : Validate.Name(input.BusinessName);
             var dir = string.IsNullOrWhiteSpace(input.BackupDir) ? null : input.BackupDir.Trim();
-            if (dir is not null) EnsureWritable(dir);
+            if (dir is not null) EnsureWritable(dir, paths);
             await s.SetAsync(SettingsService.BusinessNameKey, name);
+            var before = await b.ResolveDirAsync();
             await s.SetAsync(SettingsService.BackupDirKey, dir);
+            if (!string.Equals(before, await b.ResolveDirAsync(), StringComparison.OrdinalIgnoreCase)) b.ClearError();
             return await ToDtoAsync(s, b, c);
         });
 
@@ -51,11 +53,19 @@ public static class SettingsEndpoints
         b.LastError,
         NetworkInfo.LanUrls(NetworkInfo.Port(c)));
 
-    private static void EnsureWritable(string dir)
+    private static void EnsureWritable(string dir, FirinPaths paths)
     {
         // Servis LocalSystem olarak çalışır: eşlenmiş sürücü harfleri (Z:) ve çoğu ağ paylaşımı görünmez, klasor_yazilamiyor döner.
         if (!Path.IsPathFullyQualified(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
             throw new DomainException("yol_gecersiz", @"Yedek klasörü tam yol olmalı, örn. E:\FirinYedek");
+        // Fotoğraf klasörü ya da veri kökü olamaz: fotoğraf temizliği ve yedek budama birbirinin dosyalarına dokunmasın.
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir));
+        var photos = Path.TrimEndingDirectorySeparator(paths.PhotosDir);
+        var root = Path.TrimEndingDirectorySeparator(paths.DataDir);
+        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(full, photos, StringComparison.OrdinalIgnoreCase)
+            || full.StartsWith(photos + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new DomainException("klasor_gecersiz", "Yedek klasörü veri klasörünün kendisi ya da fotoğraf klasörü olamaz.");
         try
         {
             Directory.CreateDirectory(dir);
