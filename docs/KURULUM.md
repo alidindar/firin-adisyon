@@ -17,7 +17,8 @@
    - "Fırın Adisyon" servisini kurar. Servis bilgisayar açılınca kendiliğinden başlar, çökerse 5 saniye sonra yeniden başlar.
    - 5080 portu için güvenlik duvarı izni ekler (**Özel** ve **Etki alanı** ağları için).
    - Fişe takılıyken bilgisayarın uykuya ve hazırda bekletmeye geçmesini kapatır.
-3. Tarayıcıda `http://localhost:5080` adresini açın. İlk açılışta sahip hesabı (ad ve 4 haneli PIN) oluşturulur.
+3. Tarayıcıda `http://localhost:5080` adresini açın. İlk açılışta sahip hesabı (ad ve 4 haneli PIN) oluşturulur. **Bunu kurulumdan hemen sonra, tabletleri bağlamadan önce yapın.** Sahip hesabı oluşana kadar kurulum ekranı aynı ağdaki herkese açıktır.
+4. Bilgisayarın saatini kontrol edin: Ayarlar → Zaman ve dil → Tarih ve saat → **Saati otomatik ayarla: Açık**, **Saat dilimini otomatik ayarla: Açık** (ya da saat dilimi `(UTC+03:00) İstanbul`). Raporlar ve yedek adları bilgisayarın saatine dayanır.
 
 ### Güncelleme
 
@@ -32,9 +33,11 @@ Aynı iki komutu yeniden çalıştırın. Veriler korunur. Betik güncellemeden 
 ## 2. Sabit IP (tavsiye edilir)
 
 Tabletler kasa bilgisayarına IP adresiyle bağlanır. Adres değişirse tabletler bağlanamaz.
+- Tabletler ve kasa bilgisayarı **aynı Wi-Fi ağında** olmalıdır. "Misafir ağı" ya da modemde "AP / istemci yalıtımı" açıksa cihazlar birbirini göremez ve tabletler bağlanamaz.
 - Modemin yönetim sayfasına girin (genellikle `192.168.1.1`).
 - "DHCP" ya da "LAN" ayarlarında "Adres rezervasyonu / Sabit DHCP" bölümünü bulun.
 - Kasa bilgisayarını listeden seçip şu anki adresini sabitleyin.
+- Kasa bilgisayarı Wi-Fi ile bağlıysa Windows'ta **Rastgele donanım adreslerini kapatın**: Ayarlar → Ağ ve İnternet → Wi-Fi → bağlı olduğunuz ağın adı → **Rastgele donanım adresleri: Kapalı**. Açıkken bilgisayar modeme farklı bir adresle görünebilir ve rezervasyon tutmaz. (Kasa bilgisayarını kabloyla bağlarsanız bu sorun olmaz.)
 
 ### Güvenlik duvarı ve ağ profili
 
@@ -64,7 +67,8 @@ Kurulum betiği "Firin Adisyon 5080" adlı kuralı ekler; bu kural yalnızca **�
 ## 5. Yedekler
 
 - Program her gün otomatik yedek alır ve 30 gün saklar. Yönetim → Ayarlar'dan elle de yedek alabilir, indirebilirsiniz. Her yedek tek ve kendi başına yeterli bir dosyadır (`firin-yyyyMMdd-HHmmss.db`).
-- Yedek klasörü olarak bir **USB bellek ya da harici disk** seçmeniz tavsiye edilir (örn. `E:\FirinYedek`). Klasör mutlak bir yol olmalıdır. Boş bırakırsanız `C:\FirinAdisyon\data\backups` kullanılır.
+- **Yedek klasörü ayarını boş bırakmanızı tavsiye ederiz.** Yedekler `C:\FirinAdisyon\data\backups` içine alınır. Bunun yerine **haftada bir tüm `C:\FirinAdisyon\data` klasörünü USB belleğe kopyalayın** (fotoğraflar da böylece yedeklenir, aşağıya bakın). Yedek klasörünü USB'ye yönlendirmek yerine bu yolu seçin; çünkü USB çıkarılabilir.
+- Yine de başka bir klasör seçerseniz (örn. `E:\FirinYedek`) mutlak bir yol olmalıdır. Bu klasöre ulaşılamazsa (USB çıkarıldı, sürücü harfi değişti) program yedeği **kendiliğinden `C:\FirinAdisyon\data\backups` klasörüne alır**, yedek alınmış olur ve Ayarlar'da "Yedek klasörüne ulaşılamadı; yedek varsayılan klasöre alındı." uyarısı görünür. USB'yi geri takınca yedekler yeniden ona yazılır ve uyarı kalkar. Yedek listesi iki klasördeki yedekleri birlikte gösterir. Uygulama klasörünün (`C:\FirinAdisyon`) altındaki klasörler (`data` hariç) yedek klasörü olarak kabul edilmez; güncelleme onları silerdi.
 - Servis LocalSystem hesabıyla çalıştığı için:
   - USB / harici disk ve kullanıcının OneDrive klasörü (`C:\Users\<ad>\OneDrive\FirinYedek`) çalışır.
   - Bağlı ağ sürücüleri (örn. `Z:`) ve çoğu ağ paylaşımı (`\\sunucu\...`) servise görünmez; Ayarlar "klasör yazılamıyor" hatası verir.
@@ -84,7 +88,11 @@ Yedek dosyaları yalnızca veritabanını (ürünler, adisyonlar, ödemeler, kul
 
 Yedek dosya adındaki saat UTC'dir (Türkiye saatinden 3 saat geri). Ayarlar sayfası yedekleri Türkiye saatiyle listeler.
 
-## 6. Uygulama simgelerini yeniden üretme
+## 6. Hatalar nerede görülür
+
+Program ayrı bir günlük dosyası tutmaz. Hatalar Windows **Olay Görüntüleyicisi**'ne yazılır: Başlat'ta "Olay Görüntüleyicisi" → Windows Günlükleri → **Uygulama**. Kaynağı `FirinAdisyon` ya da `.NET Runtime` olan Uyarı ve Hata kayıtlarına bakın. Destek isterken bu kayıtların metnini gönderin.
+
+## 7. Uygulama simgelerini yeniden üretme
 
 Simgeler hazır gelir. Değiştirmek isterseniz proje klasöründe:
 
@@ -94,11 +102,21 @@ powershell -ExecutionPolicy Bypass -File scripts/make-icons.ps1
 
 Sonra `scripts\publish.ps1` ve `scripts\install-service.ps1` ile yeniden yayınlayın.
 
-## 7. Kaldırma
+## 8. Kaldırma
 
 `scripts\uninstall-service.ps1` betiğini Yönetici olarak çalıştırın. Servis ve güvenlik duvarı kuralı kalkar; veriler silinmez.
 
-## 8. Gerçek cihaz kontrol listesi
+## 9. Kurulum provası
+
+Dükkândaki ilk kurulumdan önce (geliştirme bilgisayarında ya da dükkânda mesai dışında) Yönetici PowerShell ile bir kez deneyin. Servis yolu yalnızca böyle doğrulanır:
+
+1. `scripts\install-service.ps1` çalıştırılır. `Get-Service FirinAdisyon` → **Running**.
+2. `http://localhost:5080` kurulum ekranını gösterir ve `C:\FirinAdisyon\data\firin.db` dosyası vardır.
+3. `Firin.Api.exe` işlemi Görev Yöneticisi'nden sonlandırılır: servis yaklaşık 5 saniyede geri gelir.
+4. `scripts\install-service.ps1` güncelleme olarak yeniden çalıştırılır: veriler korunur ve güncelleme öncesi kopyanın yolu ekrana yazılır.
+5. `scripts\uninstall-service.ps1` çalıştırılır: servis ve güvenlik duvarı kuralı kalkar. Provayı dükkânda yaptıysanız veriler kalır; temiz başlamak istiyorsanız `C:\FirinAdisyon` klasörünü silin.
+
+## 10. Gerçek cihaz kontrol listesi
 
 Kurulumdan sonra kasa PC'de, bir tablette ve bir telefonda sırayla deneyin. Masaüstü öykünmesi bu maddeleri göstermez. Sorun çıkan maddeyi not edin.
 
