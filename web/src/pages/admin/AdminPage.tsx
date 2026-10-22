@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { CategoriesAdmin } from './CategoriesAdmin';
 import { ProductsAdmin } from './ProductsAdmin';
+import { SettingsAdmin } from './SettingsAdmin';
 import { TablesAdmin } from './TablesAdmin';
 import { UsersAdmin } from './UsersAdmin';
 
@@ -12,6 +13,7 @@ export function AdminPage() {
         <NavLink to="/yonetim/kategoriler">Kategoriler</NavLink>
         <NavLink to="/yonetim/masalar">Masalar</NavLink>
         <NavLink to="/yonetim/kullanicilar">Kullanıcılar</NavLink>
+        <NavLink to="/yonetim/ayarlar">Ayarlar</NavLink>
       </nav>
       <Routes>
         <Route index element={<Navigate to="/yonetim/urunler" replace />} />
@@ -19,6 +21,7 @@ export function AdminPage() {
         <Route path="kategoriler" element={<CategoriesAdmin />} />
         <Route path="masalar" element={<TablesAdmin />} />
         <Route path="kullanicilar" element={<UsersAdmin />} />
+        <Route path="ayarlar" element={<SettingsAdmin />} />
       </Routes>
     </div>
   );

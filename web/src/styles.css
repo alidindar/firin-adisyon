@@ -269,3 +269,13 @@ button.wide { width: 100%; margin-top: 12px; }
 .audit-lines li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .audit-lines li span { min-width: 0; overflow-wrap: anywhere; }
 .audit-lines.voided { color: var(--muted); }
+
+.settings > section { margin-bottom: 32px; }
+.settings > section > h2 { font-size: 1.15rem; margin: 0 0 8px; }
+.ok { color: var(--ok); }
+.qr-list { display: flex; flex-wrap: wrap; gap: 16px; }
+.qr { margin: 0; padding: 12px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); text-align: center; max-width: 100%; }
+.qr svg { max-width: 100%; height: auto; }
+.qr figcaption { margin-top: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 0.9rem; user-select: all; overflow-wrap: anywhere; }
+.backup-link { text-decoration: none; color: inherit; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+code { overflow-wrap: anywhere; }

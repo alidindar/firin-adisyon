@@ -1,19 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api/client';
 import type { AuthStatus, Me, UserOption } from '../api/types';
 import { PinPad } from '../components/PinPad';
 
 export function LoginPage() {
+  const info = useQuery({ queryKey: ['info'], queryFn: () => api<{ businessName: string }>('/info') });
+  const title = info.data?.businessName ?? 'Fırın Adisyon';
+  useEffect(() => { document.title = title; }, [title]);
   const status = useQuery({ queryKey: ['auth-status'], queryFn: () => api<AuthStatus>('/auth/status') });
 
   if (status.isPending) return <div className="center">Yükleniyor…</div>;
   if (status.isError) return <div className="center error">{status.error.message}</div>;
   if (status.data.needsSetup) return <SetupForm />;
-  return <UserLogin users={status.data.users} />;
+  return <UserLogin title={title} users={status.data.users} />;
 }
 
-function UserLogin({ users }: { users: UserOption[] }) {
+function UserLogin({ title, users }: { title: string; users: UserOption[] }) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<UserOption | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ function UserLogin({ users }: { users: UserOption[] }) {
 
   return (
     <div className="login">
-      <h1>Fırın Adisyon</h1>
+      <h1>{title}</h1>
       {!selected ? (
         <>
           <p>Kim giriş yapıyor?</p>

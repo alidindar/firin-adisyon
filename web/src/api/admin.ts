@@ -9,6 +9,16 @@ export interface TableInput { name: string; sortOrder: number; isActive: boolean
 export interface UserRow { id: number; name: string; role: Role; isActive: boolean }
 export interface UserCreateInput { name: string; pin: string; role: Role }
 export interface UserUpdateInput { name: string; role: Role; isActive: boolean; pin: string | null }
+export interface SettingsRow {
+  businessName: string;
+  backupDir: string | null;
+  effectiveBackupDir: string;
+  lastBackupAt: string | null;
+  lastBackupError: string | null;
+  lanUrls: string[];
+}
+export interface SettingsInput { businessName: string | null; backupDir: string | null }
+export interface BackupRow { fileName: string; sizeBytes: number; createdAt: string }
 
 const post = <T>(path: string, json: unknown) => api<T>(path, { method: 'POST', json });
 const put = <T>(path: string, json: unknown) => api<T>(path, { method: 'PUT', json });
@@ -36,4 +46,9 @@ export const adminApi = {
   users: () => api<UserRow[]>('/admin/users'),
   createUser: (i: UserCreateInput) => post<UserRow>('/admin/users', i),
   updateUser: (id: number, i: UserUpdateInput) => put<UserRow>(`/admin/users/${id}`, i),
+
+  settings: () => api<SettingsRow>('/admin/settings'),
+  saveSettings: (i: SettingsInput) => put<SettingsRow>('/admin/settings', i),
+  backups: () => api<BackupRow[]>('/admin/backups'),
+  createBackup: () => api<BackupRow>('/admin/backups', { method: 'POST' }),
 };
