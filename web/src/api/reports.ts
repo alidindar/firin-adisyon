@@ -19,12 +19,13 @@ export interface Summary {
   days: DailyRow[];
 }
 export interface OrderHistoryRow { id: number; tableName: string; status: OrderStatus; openedAt: string; closedAt: string | null; totalKurus: number; paidKurus: number; itemCount: number }
+export interface OrderHistory { orders: OrderHistoryRow[]; hasMore: boolean }
 export interface OrderAudit { order: Order; tableName: string; voids: VoidRow[] }
 
 const q = (from: string, to: string) => `?from=${from}&to=${to}`;
 
 export const reportsApi = {
   summary: (from: string, to: string) => api<Summary>(`/reports/summary${q(from, to)}`),
-  orders: (from: string, to: string) => api<OrderHistoryRow[]>(`/reports/orders${q(from, to)}`),
+  orders: (from: string, to: string) => api<OrderHistory>(`/reports/orders${q(from, to)}`),
   order: (id: number) => api<OrderAudit>(`/reports/orders/${id}`),
 };

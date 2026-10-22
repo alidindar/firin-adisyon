@@ -74,10 +74,17 @@ const isoRe = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Özel aralık sorgulanabilir mi? Uygun değilse kullanıcıya gösterilecek kısa mesajı döner, uygunsa null. */
 export function rangeProblem(from: string, to: string): string | null {
-  if (!isoRe.test(from) || !isoRe.test(to) || from < '2000-01-01' || to < '2000-01-01') return 'Geçerli bir tarih girin.';
+  if (!isoRe.test(from) || !isoRe.test(to) || from < '2000-01-01' || to < '2000-01-01' || from > '2100-12-31' || to > '2100-12-31') return 'Geçerli bir tarih girin.';
   if (from > to) return 'Başlangıç bitişten sonra olamaz.';
   const [fy, fm, fd] = from.split('-').map(Number);
   const [ty, tm, td] = to.split('-').map(Number);
   const span = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000) + 1;
   return span > MAX_RANGE_DAYS ? `En fazla ${MAX_RANGE_DAYS} gün seçilebilir.` : null;
+}
+
+/** Rapor sorgusu hâlâ değişebilir mi? Bitişi bugünden önce kalan aralık değişmez (ödeme, iptal ve kapanış hep "şimdi" damgalanır). */
+export function isLiveReportKey(key: readonly unknown[], todayIso: string): boolean {
+  if (key[0] !== 'reports') return false;
+  if (key[1] === 'summary' || key[1] === 'orders') return String(key[3]) >= todayIso;
+  return true;
 }

@@ -24,7 +24,21 @@ export function ProductBars({ products }: { products: ProductSales[] }) {
           </li>
         ))}
       </ol>
-      {products.length > TOP && <p className="muted">ve {products.length - TOP} ürün daha</p>}
+      <details className="table-view">
+        <summary>Tüm ürünler ({products.length})</summary>
+        <table>
+          <thead><tr><th>Ürün</th><th>Miktar</th><th>Ciro</th></tr></thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={`${p.productId}-${p.unitType}`}>
+                <td>{p.productName}</td>
+                <td>{formatQuantity(p.unitType, p.quantity)}</td>
+                <td>{formatKurus(p.totalKurus)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </figure>
   );
 }

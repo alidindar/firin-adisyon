@@ -5,7 +5,7 @@ import { Modal } from '../../components/Modal';
 import { formatDateTime } from '../../lib/dates';
 import { formatKurus, formatQuantity } from '../../lib/format';
 
-export function OrderHistory({ rows }: { rows: OrderHistoryRow[] }) {
+export function OrderHistory({ rows, hasMore }: { rows: OrderHistoryRow[]; hasMore: boolean }) {
   const [openId, setOpenId] = useState<number | null>(null);
   if (rows.length === 0) return <p className="muted">Bu aralıkta kapanan hesap yok.</p>;
 
@@ -26,6 +26,7 @@ export function OrderHistory({ rows }: { rows: OrderHistoryRow[] }) {
           </li>
         ))}
       </ul>
+      {hasMore && <p className="muted">Son {rows.length} adisyon gösteriliyor; aralığı daraltın.</p>}
       {openId !== null && <OrderDetail id={openId} onClose={() => setOpenId(null)} />}
     </>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketDays, formatDayShort, presetRange, rangeProblem, toIsoDate } from './dates';
+import { bucketDays, formatDayShort, isLiveReportKey, presetRange, rangeProblem, toIsoDate } from './dates';
 
 // 22 Ekim 2026 perşembe
 const today = new Date(2026, 9, 22, 15, 30);
@@ -69,7 +69,21 @@ describe('rangeProblem', () => {
     ['2026-10-23', '2026-10-22', 'Başlangıç bitişten sonra olamaz.'],
     ['0002-01-01', '2026-10-22', 'Geçerli bir tarih girin.'],
     ['', '2026-10-22', 'Geçerli bir tarih girin.'],
+    ['2026-10-01', '9999-12-31', 'Geçerli bir tarih girin.'],
+    ['2026-10-01', '2101-01-01', 'Geçerli bir tarih girin.'],
   ])('%s .. %s', (from, to, expected) => {
     expect(rangeProblem(from, to)).toBe(expected);
+  });
+});
+
+describe('isLiveReportKey', () => {
+  it.each([
+    [['reports', 'summary', '2026-10-01', '2026-10-22'], true], // bugünü içerir
+    [['reports', 'orders', '2026-10-01', '2026-10-23'], true],
+    [['reports', 'summary', '2026-10-01', '2026-10-21'], false], // geçmişte kalan aralık değişmez
+    [['reports', 'order', 7], true],
+    [['tables'], false],
+  ])('%j', (key, expected) => {
+    expect(isLiveReportKey(key, '2026-10-22')).toBe(expected);
   });
 });

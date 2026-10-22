@@ -1,5 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { useQueryClient } from '@tanstack/react-query';
+import { isLiveReportKey, toIsoDate } from '../lib/dates';
 import { isAuthError } from './authError';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
@@ -54,7 +55,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (reportsTimer === undefined) {
         reportsTimer = window.setTimeout(() => {
           reportsTimer = undefined;
-          qc.invalidateQueries({ queryKey: ['reports'] });
+          qc.invalidateQueries({ predicate: (q) => isLiveReportKey(q.queryKey, toIsoDate(new Date())) });
         }, 3000);
       }
     });
