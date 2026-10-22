@@ -26,7 +26,7 @@ public sealed class TestApp : IDisposable
     public WebApplicationFactory<Program> Factory { get; }
     public HttpClient Client { get; }
 
-    public TestApp(Action<IServiceCollection>? configure = null)
+    public TestApp(Action<IServiceCollection>? configure = null, bool autoBackup = false)
     {
         // Gerçek wwwroot/index.html olmadan SPA fallback sınanamaz.
         var webRoot = Path.Combine(DataDir, "wwwroot");
@@ -37,6 +37,7 @@ public sealed class TestApp : IDisposable
         {
             b.UseEnvironment("Testing");
             b.UseSetting("Firin:DataDir", DataDir);
+            b.UseSetting("Firin:AutoBackup", autoBackup ? "true" : "false");
             b.UseWebRoot(webRoot);
             b.ConfigureServices(s =>
             {

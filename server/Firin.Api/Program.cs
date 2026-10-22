@@ -1,11 +1,13 @@
 using System.Text.Json.Serialization;
 using Firin.Api;
 using Firin.Api.Auth;
+using Firin.Api.Backups;
 using Firin.Api.Data;
 using Firin.Api.Endpoints;
 using Firin.Api.Orders;
 using Firin.Api.Realtime;
 using Firin.Api.Reports;
+using Firin.Api.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
@@ -27,6 +29,10 @@ builder.Services.AddScoped<PaymentService>();
 // Saat dilimi açılışta bir kez çözülür; yanlış kimlik her istekte 500 yerine açılışta net bir hatayla durdurur.
 builder.Services.AddSingleton(sp => ResolveTimeZone(sp.GetRequiredService<IConfiguration>()["Firin:TimeZone"]));
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<BackupService>();
+builder.Services.AddSingleton<PhotoCleanup>();
+builder.Services.AddHostedService<AutoBackupService>();
 // Production'da da bozuk istek gövdesi DomainExceptionHandler'a ulaşsın (varsayılan yalnızca Development).
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -75,6 +81,7 @@ api.MapTableAdminEndpoints();
 api.MapUserAdminEndpoints();
 api.MapOrderEndpoints();
 api.MapReportEndpoints();
+api.MapSettingsEndpoints();
 api.MapFallback(() => Results.NotFound());
 app.MapHub<AdisyonHub>("/hubs/adisyon");
 app.MapFallbackToFile("index.html", staticFiles);
