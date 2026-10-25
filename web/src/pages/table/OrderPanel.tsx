@@ -110,6 +110,9 @@ function SwipeRow({ item, disabled, onVoid, children }: { item: OrderItem; disab
   };
   // Kimliği render'dan render'a aynı kalır; açık satır bununla karşılaştırılır.
   const handle = useRef({ close: () => {} }).current;
+  // Dokunmatikte iptal parmak kalkınca yapılır: Chrome kaydırmadan hemen sonraki dokunuşta click'i bazen hiç üretmiyor.
+  const voidedByTouch = useRef(-Infinity);
+  const doVoid = () => { close(); onVoid(); };
   const close = () => {
     open.current = false;
     setX(0, true);
@@ -173,7 +176,24 @@ function SwipeRow({ item, disabled, onVoid, children }: { item: OrderItem; disab
   return (
     <li className={item.isPaid ? 'paid' : undefined}>
       {canSwipe && (
-        <button type="button" className="void-btn" tabIndex={-1} aria-hidden="true" onClick={() => { close(); onVoid(); }}>İptal</button>
+        <button
+          type="button"
+          className="void-btn"
+          tabIndex={-1}
+          aria-hidden="true"
+          onPointerUp={(e) => {
+            if (e.pointerType === 'mouse') return;
+            voidedByTouch.current = e.timeStamp;
+            doVoid();
+          }}
+          onClick={(e) => {
+            // Aynı dokunuşun ardından gelen click ikinci kez iptal etmesin.
+            if (e.timeStamp - voidedByTouch.current < 800) return;
+            doVoid();
+          }}
+        >
+          İptal
+        </button>
       )}
       <div
         ref={rowRef}
